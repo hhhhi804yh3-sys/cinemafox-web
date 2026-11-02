@@ -1866,6 +1866,7 @@ html, body {
   position: absolute;
   inset: 0;
   background: #000;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1877,6 +1878,19 @@ html, body {
   height: 100%;
   border: none;
   background: #000;
+}
+
+/* Precision Cinema Framing on Desktop: Crops out external sidebar, header, and deck */
+@media (min-width: 1025px) {
+  .web-player-iframe {
+    position: absolute;
+    width: 144%;
+    height: 140%;
+    left: -7.5%;
+    top: -16%;
+    border: none;
+    background: #000;
+  }
 }
 
 .player-live-badge {
