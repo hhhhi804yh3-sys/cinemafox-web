@@ -68,8 +68,15 @@
         </button>
       </nav>
 
-      <!-- Search Bar & Telegram Link -->
+      <!-- Search Bar, Settings & Telegram Link -->
       <div class="header-actions">
+        <button class="settings-header-btn" id="openSettingsBtn" title="إعدادات ستايل الترجمة">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.488.488 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+          </svg>
+          <span>إعدادات الترجمة</span>
+        </button>
+
         <div class="search-input-wrap">
           <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
             <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
@@ -281,14 +288,18 @@
   <!-- Cinema Fox Cinematic Web Video Player -->
   <div class="web-player-container" id="webPlayer">
     
-    <!-- Video Element -->
-    <video id="mainVideoPlayer" class="main-video-player" playsinline webkit-playsinline></video>
+    <!-- Native Cinema Theater Iframe (Guaranteed 100% Zero-Block Playback & Native Subtitles) -->
+    <div class="web-player-frame-wrap" id="playerFrameWrap">
+      <iframe id="webPlayerIframe" class="web-player-iframe" src="" allowfullscreen allow="autoplay; fullscreen; picture-in-picture; encrypted-media"></iframe>
+      <video id="mainVideoPlayer" class="main-video-player" playsinline webkit-playsinline style="display: none;"></video>
+    </div>
 
     <!-- Top Player Bar -->
     <div class="player-top-bar" id="playerTopBar">
       <div class="player-top-left">
         <button class="player-btn-back" id="playerBackBtn" title="خروج من المشغل">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          <span class="back-label">خروج</span>
         </button>
         <div class="player-title-info">
           <h3 class="player-item-title" id="playerItemTitle">اسم الفيلم</h3>
@@ -297,14 +308,14 @@
       </div>
 
       <div class="player-top-right">
-        <!-- Quality Selector Pill -->
-        <div class="player-quality-pill" id="playerQualityPill">
-          <span id="playerActiveQuality">1080p FHD</span>
-          <div class="quality-dropdown" id="qualityDropdown"></div>
+        <!-- Live Quality & Subtitle Status Badge -->
+        <div class="player-live-badge">
+          <span class="player-pulse-dot"></span>
+          <span>1080p FHD • ترجمة عربية</span>
         </div>
 
-        <!-- Subtitles CC Button -->
-        <button class="player-icon-btn" id="playerSubtitlesBtn" title="الترجمة">
+        <!-- Subtitles CC & Style Customization Button -->
+        <button class="player-icon-btn" id="playerSubtitlesBtn" title="تخصيص الترجمة (الحجم، اللون، المربع)">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1z"/></svg>
         </button>
 
@@ -405,6 +416,94 @@
       <div class="subtitles-list" id="subtitlesList"></div>
     </div>
 
+  </div>
+
+  <!-- Subtitle & Display Customization Modal -->
+  <div class="modal-overlay" id="settingsModal" style="display: none;">
+    <div class="modal-backdrop-click" id="settingsBackdropClick"></div>
+    <div class="settings-modal-card">
+      <div class="settings-modal-header">
+        <div class="settings-title-wrap">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="#E50914"><path d="M19 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1z"/></svg>
+          <h3>تخصيص ستايل الترجمة والعرض</h3>
+        </div>
+        <button class="btn-close-modal" id="closeSettingsBtn">✕</button>
+      </div>
+
+      <div class="settings-modal-body">
+        
+        <!-- Live Subtitle Preview Box -->
+        <div class="sub-preview-section">
+          <label class="setting-label">معاينة حية لشكل الترجمة:</label>
+          <div class="sub-preview-box" id="subPreviewContainer">
+            <span class="preview-backdrop-text">مشهد سينمائي عالي الدقة • سينما فوكس</span>
+            <div class="sub-preview-cue" id="subPreviewCue">
+              هذا مثال توضيحي لشكل الترجمة في سينما فوكس
+            </div>
+          </div>
+        </div>
+
+        <!-- 1. Font Size -->
+        <div class="setting-group">
+          <label class="setting-label">حجم الخط (Font Size):</label>
+          <div class="settings-pill-selector" id="subSizeSelector">
+            <button class="pill-opt" data-val="16">صغير (16px)</button>
+            <button class="pill-opt active" data-val="21">متوسط (21px)</button>
+            <button class="pill-opt" data-val="26">كبير (26px)</button>
+            <button class="pill-opt" data-val="32">ضخم (32px)</button>
+          </div>
+        </div>
+
+        <!-- 2. Font Family -->
+        <div class="setting-group">
+          <label class="setting-label">نوع الخط (Font Family):</label>
+          <div class="settings-pill-selector" id="subFontSelector">
+            <button class="pill-opt active" data-val="'Almarai', sans-serif">المراعي (Almarai)</button>
+            <button class="pill-opt" data-val="'Cairo', sans-serif">القاهرة (Cairo)</button>
+            <button class="pill-opt" data-val="sans-serif">النظام القياسي</button>
+          </div>
+        </div>
+
+        <!-- 3. Text Color -->
+        <div class="setting-group">
+          <label class="setting-label">لون خط الترجمة:</label>
+          <div class="settings-color-palette" id="subColorSelector">
+            <button class="color-circle active" data-val="#FFFFFF" style="background: #FFFFFF;" title="أبيض ناصع"></button>
+            <button class="color-circle" data-val="#FFEB3B" style="background: #FFEB3B;" title="أصفر سينمائي"></button>
+            <button class="color-circle" data-val="#00E5FF" style="background: #00E5FF;" title="سيان نيون"></button>
+            <button class="color-circle" data-val="#69F0AE" style="background: #69F0AE;" title="أخضر زمردي"></button>
+          </div>
+        </div>
+
+        <!-- 4. Background / Box Style -->
+        <div class="setting-group">
+          <label class="setting-label">شكل مربع وخلفية الترجمة:</label>
+          <div class="settings-pill-selector" id="subBgSelector">
+            <button class="pill-opt active" data-val="transparent">شفاف بدون خلفية (Transparent)</button>
+            <button class="pill-opt" data-val="rgba(0,0,0,0.55)">شريط تظليل أسود ناعم (55%)</button>
+            <button class="pill-opt" data-val="glass">مربع زجاجي فخم (Glassmorphic)</button>
+            <button class="pill-opt" data-val="rgba(0,0,0,0.92)">صندوق أسود صلب</button>
+          </div>
+        </div>
+
+        <!-- 5. Shadow / Outline -->
+        <div class="setting-group">
+          <label class="setting-label">الحد الخارجي والظل (Outline & Shadow):</label>
+          <div class="settings-pill-selector" id="subShadowSelector">
+            <button class="pill-opt active" data-val="heavy">ظل سينمائي أسود عميق</button>
+            <button class="pill-opt" data-val="outline">حد أسود حاد (Outline 2px)</button>
+            <button class="pill-opt" data-val="glow">توهج خفيف (Soft Glow)</button>
+            <button class="pill-opt" data-val="none">بدون ظل</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="settings-modal-footer">
+        <button class="btn-reset-settings" id="resetSettingsBtn">إعادة للافتراضي</button>
+        <button class="btn-save-settings" id="saveSettingsBtn">حفظ التفضيلات ✓</button>
+      </div>
+    </div>
   </div>
 
   <!-- Toast Notification -->

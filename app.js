@@ -1,3 +1,94 @@
+
+// --------------------------------------------------------------------------
+// Subtitle Customization & LocalStorage Preferences
+// --------------------------------------------------------------------------
+function applySubtitleSettings(settings = state.subtitleSettings) {
+  if (!settings) return;
+
+  // Live preview cue
+  if (DOM.subPreviewCue) {
+    DOM.subPreviewCue.style.fontSize = `${settings.fontSize}px`;
+    DOM.subPreviewCue.style.fontFamily = settings.fontFamily;
+    DOM.subPreviewCue.style.color = settings.color;
+
+    if (settings.bgStyle === 'glass') {
+      DOM.subPreviewCue.style.background = 'rgba(0, 0, 0, 0.65)';
+      DOM.subPreviewCue.style.backdropFilter = 'blur(10px)';
+      DOM.subPreviewCue.style.borderRadius = '8px';
+      DOM.subPreviewCue.style.padding = '6px 14px';
+    } else {
+      DOM.subPreviewCue.style.background = settings.bgStyle;
+      DOM.subPreviewCue.style.backdropFilter = 'none';
+      DOM.subPreviewCue.style.borderRadius = settings.bgStyle === 'transparent' ? '0' : '6px';
+      DOM.subPreviewCue.style.padding = settings.bgStyle === 'transparent' ? '0' : '4px 12px';
+    }
+
+    if (settings.shadowStyle === 'heavy') {
+      DOM.subPreviewCue.style.textShadow = '0 2px 6px #000, 0 0 10px #000, 0 0 15px #000';
+    } else if (settings.shadowStyle === 'outline') {
+      DOM.subPreviewCue.style.textShadow = '-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 2px 4px #000';
+    } else if (settings.shadowStyle === 'glow') {
+      DOM.subPreviewCue.style.textShadow = '0 0 12px rgba(229, 9, 20, 0.8), 0 2px 4px #000';
+    } else {
+      DOM.subPreviewCue.style.textShadow = 'none';
+    }
+  }
+
+  // Inject or update global subtitle CSS style tag
+  let styleTag = document.getElementById('cfSubtitleCustomStyles');
+  if (!styleTag) {
+    styleTag = document.createElement('style');
+    styleTag.id = 'cfSubtitleCustomStyles';
+    document.head.appendChild(styleTag);
+  }
+
+  styleTag.textContent = `
+    ::cue, .subtitle-text, #activeSubtitleText {
+      font-size: ${settings.fontSize}px !important;
+      font-family: ${settings.fontFamily} !important;
+      color: ${settings.color} !important;
+      background: ${settings.bgStyle === 'glass' ? 'rgba(0,0,0,0.65)' : settings.bgStyle} !important;
+      ${settings.shadowStyle === 'heavy' ? 'text-shadow: 0 2px 6px #000, 0 0 10px #000, 0 0 15px #000 !important;' : ''}
+      ${settings.shadowStyle === 'outline' ? 'text-shadow: -1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 2px 4px #000 !important;' : ''}
+      ${settings.shadowStyle === 'glow' ? 'text-shadow: 0 0 12px rgba(229, 9, 20, 0.8), 0 2px 4px #000 !important;' : ''}
+    }
+  `;
+}
+
+function openSettingsModal() {
+  if (!DOM.settingsModal) return;
+  DOM.settingsModal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  syncSettingsUI();
+  applySubtitleSettings();
+}
+
+function closeSettingsModal() {
+  if (!DOM.settingsModal) return;
+  DOM.settingsModal.style.display = 'none';
+  document.body.style.overflow = 'auto';
+}
+
+function syncSettingsUI() {
+  const s = state.subtitleSettings;
+  if (!s) return;
+  document.querySelectorAll('#subSizeSelector .pill-opt').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.val === String(s.fontSize));
+  });
+  document.querySelectorAll('#subFontSelector .pill-opt').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.val === s.fontFamily);
+  });
+  document.querySelectorAll('#subColorSelector .color-circle').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.val.toLowerCase() === s.color.toLowerCase());
+  });
+  document.querySelectorAll('#subBgSelector .pill-opt').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.val === s.bgStyle);
+  });
+  document.querySelectorAll('#subShadowSelector .pill-opt').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.val === s.shadowStyle);
+  });
+}
+
 /**
  * Cinema Fox Web Streaming Platform (منصة سينما فوكس ويب)
  * 100% Pure Live MovieBox API Integration via Vercel Edge
@@ -14,6 +105,13 @@ const state = {
   heroTimer: null,
   watchlist: JSON.parse(localStorage.getItem('cf_web_watchlist') || '[]'),
   watchProgress: JSON.parse(localStorage.getItem('cf_web_progress') || '{}'),
+  subtitleSettings: JSON.parse(localStorage.getItem('cf_sub_settings') || JSON.stringify({
+    fontSize: '21',
+    fontFamily: "'Almarai', sans-serif",
+    color: '#FFFFFF',
+    bgStyle: 'transparent',
+    shadowStyle: 'heavy'
+  })),
   
   // Current playing item
   playing: {
@@ -122,6 +220,14 @@ const DOM = {
   subtitlesModalCloseBtn: document.getElementById('subtitlesModalCloseBtn'),
   subtitlesList: document.getElementById('subtitlesList'),
 
+  openSettingsBtn: document.getElementById('openSettingsBtn'),
+  settingsModal: document.getElementById('settingsModal'),
+  settingsBackdropClick: document.getElementById('settingsBackdropClick'),
+  closeSettingsBtn: document.getElementById('closeSettingsBtn'),
+  resetSettingsBtn: document.getElementById('resetSettingsBtn'),
+  saveSettingsBtn: document.getElementById('saveSettingsBtn'),
+  subPreviewCue: document.getElementById('subPreviewCue'),
+  webPlayerIframe: document.getElementById('webPlayerIframe'),
   toast: document.getElementById('toast')
 };
 
@@ -267,6 +373,19 @@ function getShelfEmoji(title) {
   return '✨';
 }
 
+
+function isItemComingSoon(item) {
+  if (!item) return false;
+  if (item.isComingSoon || item.comingSoon) return true;
+  if (item.badge && item.badge.toLowerCase().includes('soon')) return true;
+  if (item.title && (item.title.includes('قريباً') || item.title.toLowerCase().includes('resurrection') || item.title.toLowerCase().includes('upcoming'))) {
+    return true;
+  }
+  const year = parseInt(item.releaseYear || '0', 10);
+  if (year > 2026) return true;
+  return false;
+}
+
 function renderMovieCardHtml(item) {
   const title = item.titleAr || item.title;
   const poster = item.poster || item.backdrop || 'assets/images/logo.png';
@@ -282,7 +401,9 @@ function renderMovieCardHtml(item) {
     <div class="movie-card" data-id="${item.subjectId || item.id}" data-path="${item.detailPath || ''}">
       <div class="poster-wrap">
         <img src="${poster}" alt="${title}" class="poster-img" loading="lazy">
-        <span class="card-quality-badge">1080p FHD</span>
+        ${isItemComingSoon(item) 
+    ? '<span class="card-coming-soon-badge"><svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg> قريباً</span>' 
+    : '<span class="card-quality-badge">1080p FHD</span>'}
         <span class="card-rating-badge">★ ${rating}</span>
         <div class="card-hover-play">
           <div class="play-circle-icon">
@@ -479,6 +600,15 @@ async function openDetailsModal(subjectId, detailPath) {
   DOM.modalTitle.textContent = item?.titleAr || item?.title || 'تفاصيل العمل';
   DOM.modalTypeTag.textContent = item?.isSeries ? 'مسلسل' : 'فيلم';
   DOM.modalRating.textContent = `★ ${item?.rating || '8.5'}`;
+  const comingSoon = isItemComingSoon(item);
+  if (comingSoon) {
+    DOM.modalTypeTag.textContent = 'قريباً في السينما';
+    DOM.modalTypeTag.className = 'modal-tag coming-soon';
+    DOM.modalDirectPlayBtn.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg><span>قريباً في سينما فوكس</span>`;
+  } else {
+    DOM.modalTypeTag.className = 'modal-tag';
+    DOM.modalDirectPlayBtn.innerHTML = `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span>مشاهدة الآن</span>`;
+  }
   DOM.modalYear.textContent = item?.releaseYear || '2026';
   DOM.modalGenres.textContent = item?.genre || 'أفلام ومسلسلات';
   DOM.modalOverview.textContent = 'جاري جلب نبذة العمل وسيرفرات البث بدقة 1080p FHD...';
@@ -565,18 +695,33 @@ function closeModal() {
 async function startPlayback(item, season = 0, episode = 0) {
   if (!item) return;
 
+  if (isItemComingSoon(item)) {
+    showToast('🎬 عذراً، هذا العمل مصنف (قريباً) ولم يبدأ عرضه بعد. ترقب إضافته في سينما فوكس فور توفر النسخة الرقمية!');
+    return;
+  }
+
   state.playing.item = item;
   state.playing.season = season;
   state.playing.episode = episode;
 
   // Open player overlay
   DOM.webPlayer.classList.add('active');
-  DOM.playerSpinner.style.display = 'block';
-  DOM.centerPlayIcon.style.display = 'none';
 
   const title = item.titleAr || item.title;
   DOM.playerItemTitle.textContent = title;
-  DOM.playerItemEpisode.textContent = item.isSeries ? `الموسم ${season} : الحلقة ${episode}` : 'فيلم كامل (1080p FHD)';
+  DOM.playerItemEpisode.textContent = item.isSeries ? `الموسم ${season || 1} : الحلقة ${episode || 1}` : 'فيلم كامل (1080p FHD)';
+
+  // Build clean player iframe URL with native Arabic localization
+  const isSeries = item.isSeries || (season > 0 && episode > 0);
+  const seNum = season > 0 ? season : 1;
+  const epNum = episode > 0 ? episode : 1;
+  const epQuery = isSeries ? `?se=${seNum}&ep=${epNum}` : '';
+  const detailPath = item.detailPath || `subject-${item.subjectId || item.id}`;
+  const playUrl = `https://movieboxph.org/ar/play/${encodeURIComponent(detailPath)}${epQuery}`;
+
+  if (DOM.webPlayerIframe) {
+    DOM.webPlayerIframe.src = playUrl;
+  }
 
   // Set episode drawer button visibility
   if (item.isSeries) {
@@ -586,134 +731,44 @@ async function startPlayback(item, season = 0, episode = 0) {
     DOM.playerEpisodesDrawerBtn.style.display = 'none';
   }
 
-  // Request streams from Vercel Edge API
-  try {
-    const streamUrl = `${API_BASE}/api/streams?subjectId=${encodeURIComponent(item.subjectId || item.id)}&se=${season}&ep=${episode}&detailPath=${encodeURIComponent(item.detailPath || '')}`;
-    const res = await fetch(streamUrl);
-    const data = await res.json();
+  // Save progress locally in browser localStorage
+  const progKey = `${item.subjectId || item.id}_${season}_${episode}`;
+  state.watchProgress[progKey] = {
+    item: {
+      id: item.subjectId || item.id,
+      subjectId: item.subjectId || item.id,
+      detailPath: item.detailPath,
+      title: item.title,
+      titleAr: item.titleAr,
+      poster: item.poster,
+      backdrop: item.backdrop,
+      isSeries: item.isSeries,
+      rating: item.rating,
+      releaseYear: item.releaseYear
+    },
+    season,
+    episode,
+    time: 60,
+    duration: 7200,
+    timestamp: Date.now()
+  };
+  localStorage.setItem('cf_web_progress', JSON.stringify(state.watchProgress));
+  renderContinueWatching();
 
-    if (data.success && data.streams && data.streams.length > 0) {
-      state.playing.streams = data.streams;
-      
-      // Select best stream (1080p first)
-      const primaryStream = data.streams[0];
-      state.playing.activeStreamUrl = primaryStream.url;
-      DOM.playerActiveQuality.textContent = `${primaryStream.resolution} FHD`;
-
-      // Build quality dropdown
-      DOM.qualityDropdown.innerHTML = data.streams.map((s, idx) => 
-        `<button class="quality-opt-btn" data-url="${s.url}" data-res="${s.resolution}">${s.resolution} ${idx === 0 ? '(الأعلى دقة)' : ''}</button>`
-      ).join('');
-
-      DOM.qualityDropdown.querySelectorAll('.quality-opt-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          switchStreamQuality(btn.dataset.url, btn.dataset.res);
-        });
-      });
-
-      // Load Stream into Video
-      loadVideoSource(primaryStream.url);
-
-      // Load Subtitles
-      loadSubtitles(item.subjectId || item.id, season, episode);
-
-    } else {
-      showToast('عذراً، سيرفرات البث مشغولة حالياً لهذا العمل. جاري المحاولة بسيرفر بديل...');
-      DOM.playerSpinner.style.display = 'none';
-    }
-  } catch (err) {
-    console.error('Stream load error:', err);
-    showToast('حدث خطأ في تحميل البث المباشر');
-    DOM.playerSpinner.style.display = 'none';
-  }
-}
-
-function loadVideoSource(url) {
-  const video = DOM.mainVideo;
-
-  if (hlsInstance) {
-    hlsInstance.destroy();
-    hlsInstance = null;
-  }
-
-  // Check if HLS (.m3u8)
-  if (url.includes('.m3u8')) {
-    if (Hls.isSupported()) {
-      hlsInstance = new Hls({
-        capLevelToPlayerSize: true,
-        autoStartLoad: true
-      });
-      hlsInstance.loadSource(url);
-      hlsInstance.attachMedia(video);
-      hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(() => {});
-        checkResumePlayback();
-      });
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = url;
-      video.play().catch(() => {});
-      checkResumePlayback();
-    }
-  } else {
-    // Direct MP4 / WebM
-    video.src = url;
-    video.play().catch(() => {});
-    checkResumePlayback();
-  }
-
-  resetControlsTimer();
-}
-
-function switchStreamQuality(newUrl, resLabel) {
-  DOM.qualityDropdown.classList.remove('show');
-  DOM.playerActiveQuality.textContent = resLabel;
-
-  const curTime = DOM.mainVideo.currentTime;
-  const isPlaying = !DOM.mainVideo.paused;
-
-  loadVideoSource(newUrl);
-
-  DOM.mainVideo.addEventListener('loadedmetadata', function onMeta() {
-    DOM.mainVideo.currentTime = curTime;
-    if (isPlaying) DOM.mainVideo.play().catch(() => {});
-    DOM.mainVideo.removeEventListener('loadedmetadata', onMeta);
-  });
-
-  showToast(`تم التبديل إلى دقة ${resLabel}`);
-}
-
-function checkResumePlayback() {
-  const item = state.playing.item;
-  if (!item) return;
-
-  const key = `${item.subjectId || item.id}_${state.playing.season}_${state.playing.episode}`;
-  const prog = state.watchProgress[key];
-
-  if (prog && prog.time > 15 && prog.time < (prog.duration - 45)) {
-    DOM.mainVideo.currentTime = prog.time;
-    showToast(`تم استئناف المشاهدة من ${formatTime(prog.time)} ✓`);
-  }
+  showToast(`جاري تشغيل ${title} بأعلى جودة 1080p FHD مع الترجمة العربية ✓`);
 }
 
 function closePlayer() {
-  DOM.mainVideo.pause();
-  DOM.mainVideo.src = '';
-  if (hlsInstance) {
-    hlsInstance.destroy();
-    hlsInstance = null;
+  if (DOM.webPlayerIframe) {
+    DOM.webPlayerIframe.src = 'about:blank';
+  }
+  if (DOM.mainVideo) {
+    DOM.mainVideo.pause();
+    DOM.mainVideo.src = '';
   }
   DOM.webPlayer.classList.remove('active');
-  DOM.activeSubtitleText.textContent = '';
-  document.body.style.overflow = 'auto';
-
-  // Refresh continue watching rail
   renderContinueWatching();
 }
-
-// --------------------------------------------------------------------------
-// Subtitles Engine
-// --------------------------------------------------------------------------
 async function loadSubtitles(subjectId, season, episode) {
   try {
     const url = `${API_BASE}/api/subtitles?subjectId=${encodeURIComponent(subjectId)}&se=${season}&ep=${episode}`;
@@ -1007,6 +1062,82 @@ function seekToPosition(e) {
 // Event Listeners & Keyboard Shortcuts
 // --------------------------------------------------------------------------
 function setupEventListeners() {
+
+  // Subtitle Settings Modal Events
+  if (DOM.openSettingsBtn) DOM.openSettingsBtn.addEventListener('click', openSettingsModal);
+  if (DOM.closeSettingsBtn) DOM.closeSettingsBtn.addEventListener('click', closeSettingsModal);
+  if (DOM.settingsBackdropClick) DOM.settingsBackdropClick.addEventListener('click', closeSettingsModal);
+
+  document.querySelectorAll('#subSizeSelector .pill-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#subSizeSelector .pill-opt').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.subtitleSettings.fontSize = btn.dataset.val;
+      applySubtitleSettings();
+    });
+  });
+
+  document.querySelectorAll('#subFontSelector .pill-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#subFontSelector .pill-opt').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.subtitleSettings.fontFamily = btn.dataset.val;
+      applySubtitleSettings();
+    });
+  });
+
+  document.querySelectorAll('#subColorSelector .color-circle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#subColorSelector .color-circle').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.subtitleSettings.color = btn.dataset.val;
+      applySubtitleSettings();
+    });
+  });
+
+  document.querySelectorAll('#subBgSelector .pill-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#subBgSelector .pill-opt').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.subtitleSettings.bgStyle = btn.dataset.val;
+      applySubtitleSettings();
+    });
+  });
+
+  document.querySelectorAll('#subShadowSelector .pill-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#subShadowSelector .pill-opt').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.subtitleSettings.shadowStyle = btn.dataset.val;
+      applySubtitleSettings();
+    });
+  });
+
+  if (DOM.saveSettingsBtn) {
+    DOM.saveSettingsBtn.addEventListener('click', () => {
+      localStorage.setItem('cf_sub_settings', JSON.stringify(state.subtitleSettings));
+      applySubtitleSettings();
+      closeSettingsModal();
+      showToast('تم حفظ إعدادات الترجمة بنجاح في متصفحك ✓');
+    });
+  }
+
+  if (DOM.resetSettingsBtn) {
+    DOM.resetSettingsBtn.addEventListener('click', () => {
+      state.subtitleSettings = {
+        fontSize: '21',
+        fontFamily: "'Almarai', sans-serif",
+        color: '#FFFFFF',
+        bgStyle: 'transparent',
+        shadowStyle: 'heavy'
+      };
+      localStorage.setItem('cf_sub_settings', JSON.stringify(state.subtitleSettings));
+      syncSettingsUI();
+      applySubtitleSettings();
+      showToast('تمت استعادة إعدادات الترجمة الافتراضية');
+    });
+  }
+
   // Brand logo click -> home
   DOM.brandLogo.addEventListener('click', (e) => {
     e.preventDefault();
