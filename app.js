@@ -738,22 +738,21 @@ async function startPlayback(item, season = 0, episode = 0) {
 
   // Open player overlay
   DOM.webPlayer.classList.add('active');
+  document.body.style.overflow = 'hidden';
 
   const title = item.titleAr || item.title;
   DOM.playerItemTitle.textContent = title;
   DOM.playerItemEpisode.textContent = item.isSeries ? `الموسم ${season || 1} : الحلقة ${episode || 1}` : 'فيلم كامل (1080p FHD)';
 
-  // Build clean player iframe URL with native Arabic localization
-  const isSeries = item.isSeries || (season > 0 && episode > 0);
-  const seNum = season > 0 ? season : 1;
-  const epNum = episode > 0 ? episode : 1;
-  const epQuery = isSeries ? `?se=${seNum}&ep=${epNum}` : '';
-  const detailPath = item.detailPath || `subject-${item.subjectId || item.id}`;
-  const playUrl = `https://movieboxph.org/ar/play/${encodeURIComponent(detailPath)}${epQuery}`;
-
+  // Activate our custom CinemaFox HTML5 video player and guarantee external iframe is completely disabled
+  DOM.mainVideo.style.display = 'block';
   if (DOM.webPlayerIframe) {
-    DOM.webPlayerIframe.src = playUrl;
+    DOM.webPlayerIframe.style.display = 'none';
+    DOM.webPlayerIframe.src = 'about:blank';
   }
+
+  // Show buffering spinner
+  DOM.playerSpinner.style.display = 'block';
 
   // Set episode drawer button visibility
   if (item.isSeries) {
@@ -761,6 +760,46 @@ async function startPlayback(item, season = 0, episode = 0) {
     DOM.drawerSeriesTitle.textContent = `${title} • الحلقات`;
   } else {
     DOM.playerEpisodesDrawerBtn.style.display = 'none';
+  }
+
+  // Fetch real streams and Arabic subtitles
+  const isSeries = item.isSeries || (season > 0 && episode > 0);
+  const seNum = season > 0 ? season : (isSeries ? 1 : 0);
+  const epNum = episode > 0 ? episode : (isSeries ? 1 : 0);
+  const detailPath = item.detailPath || `subject-${item.subjectId || item.id}`;
+
+  // 1. Load Arabic Subtitles in parallel
+  loadSubtitles(item.subjectId || item.id, seNum, epNum);
+
+  // 2. Fetch and start video stream
+  try {
+    const streamRes = await fetch(`${API_BASE}/api/streams?subjectId=${encodeURIComponent(item.subjectId || item.id)}&se=${seNum}&ep=${epNum}&detailPath=${encodeURIComponent(detailPath)}&title=${encodeURIComponent(item.title || '')}`);
+    const streamData = await streamRes.json();
+
+    if (streamData.success && streamData.streams && streamData.streams.length > 0) {
+      state.playing.streams = streamData.streams;
+      const bestStream = streamData.streams[0]; // Highest resolution (1080p / 720p)
+
+      DOM.mainVideo.src = bestStream.url;
+      DOM.mainVideo.load();
+
+      const playPromise = DOM.mainVideo.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(err => {
+          console.warn('Autoplay waiting for user tap:', err);
+          DOM.playerSpinner.style.display = 'none';
+        });
+      }
+
+      showToast(`🎬 تشغيل ${title} (${bestStream.resolution || '1080p FHD'})`);
+    } else {
+      DOM.playerSpinner.style.display = 'none';
+      showToast('⚠️ جاري تجهيز سيرفر البث، يرجى المحاولة بعد قليل');
+    }
+  } catch (err) {
+    console.error('Playback stream error:', err);
+    DOM.playerSpinner.style.display = 'none';
+    showToast('⚠️ تعذر الاتصال بسيرفر البث');
   }
 
   // Save progress locally in browser localStorage
@@ -780,25 +819,25 @@ async function startPlayback(item, season = 0, episode = 0) {
     },
     season,
     episode,
-    time: 60,
+    time: 0,
     duration: 7200,
     timestamp: Date.now()
   };
   localStorage.setItem('cf_web_progress', JSON.stringify(state.watchProgress));
   renderContinueWatching();
-
-  showToast(`جاري تشغيل ${title} بأعلى جودة 1080p FHD مع الترجمة العربية ✓`);
 }
 
 function closePlayer() {
-  if (DOM.webPlayerIframe) {
-    DOM.webPlayerIframe.src = 'about:blank';
-  }
   if (DOM.mainVideo) {
     DOM.mainVideo.pause();
     DOM.mainVideo.src = '';
   }
+  if (DOM.webPlayerIframe) {
+    DOM.webPlayerIframe.src = 'about:blank';
+    DOM.webPlayerIframe.style.display = 'none';
+  }
   DOM.webPlayer.classList.remove('active');
+  document.body.style.overflow = 'auto';
   renderContinueWatching();
 }
 async function loadSubtitles(subjectId, season, episode) {
