@@ -1,94 +1,3 @@
-
-// --------------------------------------------------------------------------
-// Subtitle Customization & LocalStorage Preferences
-// --------------------------------------------------------------------------
-function applySubtitleSettings(settings = state.subtitleSettings) {
-  if (!settings) return;
-
-  // Live preview cue
-  if (DOM.subPreviewCue) {
-    DOM.subPreviewCue.style.fontSize = `${settings.fontSize}px`;
-    DOM.subPreviewCue.style.fontFamily = settings.fontFamily;
-    DOM.subPreviewCue.style.color = settings.color;
-
-    if (settings.bgStyle === 'glass') {
-      DOM.subPreviewCue.style.background = 'rgba(0, 0, 0, 0.65)';
-      DOM.subPreviewCue.style.backdropFilter = 'blur(10px)';
-      DOM.subPreviewCue.style.borderRadius = '8px';
-      DOM.subPreviewCue.style.padding = '6px 14px';
-    } else {
-      DOM.subPreviewCue.style.background = settings.bgStyle;
-      DOM.subPreviewCue.style.backdropFilter = 'none';
-      DOM.subPreviewCue.style.borderRadius = settings.bgStyle === 'transparent' ? '0' : '6px';
-      DOM.subPreviewCue.style.padding = settings.bgStyle === 'transparent' ? '0' : '4px 12px';
-    }
-
-    if (settings.shadowStyle === 'heavy') {
-      DOM.subPreviewCue.style.textShadow = '0 2px 6px #000, 0 0 10px #000, 0 0 15px #000';
-    } else if (settings.shadowStyle === 'outline') {
-      DOM.subPreviewCue.style.textShadow = '-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 2px 4px #000';
-    } else if (settings.shadowStyle === 'glow') {
-      DOM.subPreviewCue.style.textShadow = '0 0 12px rgba(229, 9, 20, 0.8), 0 2px 4px #000';
-    } else {
-      DOM.subPreviewCue.style.textShadow = 'none';
-    }
-  }
-
-  // Inject or update global subtitle CSS style tag
-  let styleTag = document.getElementById('cfSubtitleCustomStyles');
-  if (!styleTag) {
-    styleTag = document.createElement('style');
-    styleTag.id = 'cfSubtitleCustomStyles';
-    document.head.appendChild(styleTag);
-  }
-
-  styleTag.textContent = `
-    ::cue, .subtitle-text, #activeSubtitleText {
-      font-size: ${settings.fontSize}px !important;
-      font-family: ${settings.fontFamily} !important;
-      color: ${settings.color} !important;
-      background: ${settings.bgStyle === 'glass' ? 'rgba(0,0,0,0.65)' : settings.bgStyle} !important;
-      ${settings.shadowStyle === 'heavy' ? 'text-shadow: 0 2px 6px #000, 0 0 10px #000, 0 0 15px #000 !important;' : ''}
-      ${settings.shadowStyle === 'outline' ? 'text-shadow: -1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 2px 4px #000 !important;' : ''}
-      ${settings.shadowStyle === 'glow' ? 'text-shadow: 0 0 12px rgba(229, 9, 20, 0.8), 0 2px 4px #000 !important;' : ''}
-    }
-  `;
-}
-
-function openSettingsModal() {
-  if (!DOM.settingsModal) return;
-  DOM.settingsModal.style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-  syncSettingsUI();
-  applySubtitleSettings();
-}
-
-function closeSettingsModal() {
-  if (!DOM.settingsModal) return;
-  DOM.settingsModal.style.display = 'none';
-  document.body.style.overflow = 'auto';
-}
-
-function syncSettingsUI() {
-  const s = state.subtitleSettings;
-  if (!s) return;
-  document.querySelectorAll('#subSizeSelector .pill-opt').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.val === String(s.fontSize));
-  });
-  document.querySelectorAll('#subFontSelector .pill-opt').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.val === s.fontFamily);
-  });
-  document.querySelectorAll('#subColorSelector .color-circle').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.val.toLowerCase() === s.color.toLowerCase());
-  });
-  document.querySelectorAll('#subBgSelector .pill-opt').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.val === s.bgStyle);
-  });
-  document.querySelectorAll('#subShadowSelector .pill-opt').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.val === s.shadowStyle);
-  });
-}
-
 /**
  * Cinema Fox Web Streaming Platform (منصة سينما فوكس ويب)
  * 100% Pure Live MovieBox API Integration via Vercel Edge
@@ -231,41 +140,164 @@ const DOM = {
   toast: document.getElementById('toast')
 };
 
+// --------------------------------------------------------------------------
+// Subtitle Customization & LocalStorage Preferences
+// --------------------------------------------------------------------------
+function applySubtitleSettings(settings = state.subtitleSettings) {
+  if (!settings) return;
+
+  // Live preview cue
+  if (DOM.subPreviewCue) {
+    DOM.subPreviewCue.style.fontSize = `${settings.fontSize}px`;
+    DOM.subPreviewCue.style.fontFamily = settings.fontFamily;
+    DOM.subPreviewCue.style.color = settings.color;
+
+    if (settings.bgStyle === 'glass') {
+      DOM.subPreviewCue.style.background = 'rgba(0, 0, 0, 0.65)';
+      DOM.subPreviewCue.style.backdropFilter = 'blur(10px)';
+      DOM.subPreviewCue.style.borderRadius = '8px';
+      DOM.subPreviewCue.style.padding = '6px 14px';
+    } else {
+      DOM.subPreviewCue.style.background = settings.bgStyle;
+      DOM.subPreviewCue.style.backdropFilter = 'none';
+      DOM.subPreviewCue.style.borderRadius = settings.bgStyle === 'transparent' ? '0' : '6px';
+      DOM.subPreviewCue.style.padding = settings.bgStyle === 'transparent' ? '0' : '4px 12px';
+    }
+
+    if (settings.shadowStyle === 'heavy') {
+      DOM.subPreviewCue.style.textShadow = '0 2px 6px #000, 0 0 10px #000, 0 0 15px #000';
+    } else if (settings.shadowStyle === 'outline') {
+      DOM.subPreviewCue.style.textShadow = '-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 2px 4px #000';
+    } else if (settings.shadowStyle === 'glow') {
+      DOM.subPreviewCue.style.textShadow = '0 0 12px rgba(229, 9, 20, 0.8), 0 2px 4px #000';
+    } else {
+      DOM.subPreviewCue.style.textShadow = 'none';
+    }
+  }
+
+  // Inject or update global subtitle CSS style tag
+  let styleTag = document.getElementById('cfSubtitleCustomStyles');
+  if (!styleTag) {
+    styleTag = document.createElement('style');
+    styleTag.id = 'cfSubtitleCustomStyles';
+    document.head.appendChild(styleTag);
+  }
+
+  styleTag.textContent = `
+    ::cue, .subtitle-text, #activeSubtitleText {
+      font-size: ${settings.fontSize}px !important;
+      font-family: ${settings.fontFamily} !important;
+      color: ${settings.color} !important;
+      background: ${settings.bgStyle === 'glass' ? 'rgba(0,0,0,0.65)' : settings.bgStyle} !important;
+      ${settings.shadowStyle === 'heavy' ? 'text-shadow: 0 2px 6px #000, 0 0 10px #000, 0 0 15px #000 !important;' : ''}
+      ${settings.shadowStyle === 'outline' ? 'text-shadow: -1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 2px 4px #000 !important;' : ''}
+      ${settings.shadowStyle === 'glow' ? 'text-shadow: 0 0 12px rgba(229, 9, 20, 0.8), 0 2px 4px #000 !important;' : ''}
+    }
+  `;
+}
+
+function openSettingsModal() {
+  if (!DOM.settingsModal) return;
+  DOM.settingsModal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  syncSettingsUI();
+  applySubtitleSettings();
+}
+
+function closeSettingsModal() {
+  if (!DOM.settingsModal) return;
+  DOM.settingsModal.style.display = 'none';
+  document.body.style.overflow = 'auto';
+}
+
+function syncSettingsUI() {
+  const s = state.subtitleSettings;
+  if (!s) return;
+  document.querySelectorAll('#subSizeSelector .pill-opt').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.val === String(s.fontSize));
+  });
+  document.querySelectorAll('#subFontSelector .pill-opt').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.val === s.fontFamily);
+  });
+  document.querySelectorAll('#subColorSelector .color-circle').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.val.toLowerCase() === s.color.toLowerCase());
+  });
+  document.querySelectorAll('#subBgSelector .pill-opt').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.val === s.bgStyle);
+  });
+  document.querySelectorAll('#subShadowSelector .pill-opt').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.val === s.shadowStyle);
+  });
+}
+
+
+
 let hlsInstance = null;
 let controlsTimeout = null;
 let searchTimeout = null;
 let isScrubbing = false;
 
 // --------------------------------------------------------------------------
-// Initialization & Home Feed Loader
+// Initialization & Home Feed Loader (Instant Fast Load + Live API Sync)
 // --------------------------------------------------------------------------
 async function initApp() {
   updateWatchlistCount();
   setupEventListeners();
   renderContinueWatching();
+  applySubtitleSettings();
 
+  // 1. Instant Cache from localStorage or bundled assets/data/home.json
+  let hasRendered = false;
+  try {
+    const cached = localStorage.getItem('cf_cached_home');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && parsed.banners && parsed.banners.length > 0) {
+        state.banners = parsed.banners;
+        state.shelves = parsed.shelves || [];
+        renderHeroBanner();
+        renderShelves();
+        hasRendered = true;
+      }
+    }
+  } catch (_) {}
+
+  // If no localStorage cache, load bundled home.json instantly (<50ms)
+  if (!hasRendered) {
+    try {
+      const localRes = await fetch('assets/data/home.json');
+      if (localRes.ok) {
+        const localData = await localRes.json();
+        if (localData && localData.banners && localData.banners.length > 0) {
+          state.banners = localData.banners;
+          state.shelves = localData.shelves || [];
+          renderHeroBanner();
+          renderShelves();
+          hasRendered = true;
+        }
+      }
+    } catch (_) {}
+  }
+
+  // 2. Fetch fresh live feed from Vercel Edge API in background
   try {
     const res = await fetch(`${API_BASE}/api/home`);
     const data = await res.json();
 
-    if (data.success) {
-      state.banners = data.banners || [];
+    if (data.success && data.banners && data.banners.length > 0) {
+      state.banners = data.banners;
       state.shelves = data.shelves || [];
+
+      // Save to localStorage cache for instant future visits
+      try {
+        localStorage.setItem('cf_cached_home', JSON.stringify(data));
+      } catch (_) {}
 
       renderHeroBanner();
       renderShelves();
-    } else {
-      showToast('تعذر جلب الأعمال الحالية، جاري إعادة المحاولة...');
     }
   } catch (err) {
-    console.error('Home feed error:', err);
-    DOM.dynamicShelvesContainer.innerHTML = `
-      <div class="section-container" style="text-align:center; padding: 60px 20px;">
-        <h3 style="color:#fff; margin-bottom:12px;">تعذر الاتصال بسيرفر البث</h3>
-        <p style="color:var(--text-muted); margin-bottom:20px;">يرجى التحقق من اتصال الإنترنت والضغط على زر التحديث</p>
-        <button class="btn-play-hero" onclick="location.reload()" style="margin: 0 auto;">إعادة المحاولة ↻</button>
-      </div>
-    `;
+    console.warn('Live API sync notice:', err);
   }
 }
 
@@ -1202,41 +1234,53 @@ function setupEventListeners() {
   });
 
   // Player Actions
-  DOM.playerBackBtn.addEventListener('click', closePlayer);
-  DOM.playerCenterPlayBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (DOM.mainVideo.paused) DOM.mainVideo.play().catch(() => {});
-    else DOM.mainVideo.pause();
-  });
-  DOM.playerPlayPauseBtn.addEventListener('click', () => {
-    if (DOM.mainVideo.paused) DOM.mainVideo.play().catch(() => {});
-    else DOM.mainVideo.pause();
-  });
-  DOM.playerRewind10Btn.addEventListener('click', () => seekRelative(-10));
-  DOM.playerForward10Btn.addEventListener('click', () => seekRelative(10));
-  DOM.playerFullscreenBtn.addEventListener('click', toggleFullscreen);
+  if (DOM.playerBackBtn) DOM.playerBackBtn.addEventListener('click', closePlayer);
+  if (DOM.playerCenterPlayBtn) {
+    DOM.playerCenterPlayBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (DOM.mainVideo && DOM.mainVideo.paused) DOM.mainVideo.play().catch(() => {});
+      else if (DOM.mainVideo) DOM.mainVideo.pause();
+    });
+  }
+  if (DOM.playerPlayPauseBtn) {
+    DOM.playerPlayPauseBtn.addEventListener('click', () => {
+      if (DOM.mainVideo && DOM.mainVideo.paused) DOM.mainVideo.play().catch(() => {});
+      else if (DOM.mainVideo) DOM.mainVideo.pause();
+    });
+  }
+  if (DOM.playerRewind10Btn) DOM.playerRewind10Btn.addEventListener('click', () => seekRelative(-10));
+  if (DOM.playerForward10Btn) DOM.playerForward10Btn.addEventListener('click', () => seekRelative(10));
+  if (DOM.playerFullscreenBtn) DOM.playerFullscreenBtn.addEventListener('click', toggleFullscreen);
 
-  // Quality Dropdown Toggle
-  DOM.playerQualityPill.addEventListener('click', (e) => {
-    e.stopPropagation();
-    DOM.qualityDropdown.classList.toggle('show');
-  });
+  // Quality Dropdown Toggle (if present)
+  if (DOM.playerQualityPill) {
+    DOM.playerQualityPill.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (DOM.qualityDropdown) DOM.qualityDropdown.classList.toggle('show');
+    });
+  }
 
-  // Subtitles Modal Toggle
-  DOM.playerSubtitlesBtn.addEventListener('click', () => {
-    DOM.playerSubtitlesModal.style.display = 'block';
-  });
-  DOM.subtitlesModalCloseBtn.addEventListener('click', () => {
-    DOM.playerSubtitlesModal.style.display = 'none';
-  });
+  // Subtitles Customization Modal Trigger
+  if (DOM.playerSubtitlesBtn) {
+    DOM.playerSubtitlesBtn.addEventListener('click', openSettingsModal);
+  }
+  if (DOM.subtitlesModalCloseBtn) {
+    DOM.subtitlesModalCloseBtn.addEventListener('click', () => {
+      if (DOM.playerSubtitlesModal) DOM.playerSubtitlesModal.style.display = 'none';
+    });
+  }
 
   // Episodes Drawer Toggle
-  DOM.playerEpisodesDrawerBtn.addEventListener('click', () => {
-    DOM.playerEpisodesDrawer.classList.toggle('open');
-  });
-  DOM.drawerCloseBtn.addEventListener('click', () => {
-    DOM.playerEpisodesDrawer.classList.remove('open');
-  });
+  if (DOM.playerEpisodesDrawerBtn) {
+    DOM.playerEpisodesDrawerBtn.addEventListener('click', () => {
+      if (DOM.playerEpisodesDrawer) DOM.playerEpisodesDrawer.classList.toggle('open');
+    });
+  }
+  if (DOM.drawerCloseBtn) {
+    DOM.drawerCloseBtn.addEventListener('click', () => {
+      if (DOM.playerEpisodesDrawer) DOM.playerEpisodesDrawer.classList.remove('open');
+    });
+  }
 
   // Keyboard Shortcuts
   window.addEventListener('keydown', (e) => {
