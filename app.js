@@ -1,0 +1,1168 @@
+/**
+ * Cinema Fox Web Streaming Platform (منصة سينما فوكس ويب)
+ * 100% Pure Live MovieBox API Integration via Vercel Edge
+ */
+
+const API_BASE = 'https://cinemafox-api.vercel.app';
+
+// Application State
+const state = {
+  banners: [],
+  shelves: [],
+  activeFilter: 'all',
+  currentHeroIdx: 0,
+  heroTimer: null,
+  watchlist: JSON.parse(localStorage.getItem('cf_web_watchlist') || '[]'),
+  watchProgress: JSON.parse(localStorage.getItem('cf_web_progress') || '{}'),
+  
+  // Current playing item
+  playing: {
+    item: null,
+    season: 0,
+    episode: 0,
+    streams: [],
+    activeStreamUrl: '',
+    subtitles: [],
+    activeSubtitleTrack: null,
+    subCues: []
+  },
+  
+  // Modal active item
+  modalItem: null,
+  modalDetails: null
+};
+
+// DOM Elements
+const DOM = {
+  header: document.getElementById('header'),
+  brandLogo: document.getElementById('brandLogo'),
+  searchInput: document.getElementById('searchInput'),
+  clearSearchBtn: document.getElementById('clearSearchBtn'),
+  searchView: document.getElementById('searchView'),
+  catalogView: document.getElementById('catalogView'),
+  searchTermText: document.getElementById('searchTermText'),
+  searchResultsCount: document.getElementById('searchResultsCount'),
+  searchResultsGrid: document.getElementById('searchResultsGrid'),
+
+  // Hero
+  heroBackdrop: document.getElementById('heroBackdrop'),
+  heroTypeBadge: document.getElementById('heroTypeBadge'),
+  heroRatingBadge: document.getElementById('heroRatingBadge'),
+  heroYearBadge: document.getElementById('heroYearBadge'),
+  heroTitle: document.getElementById('heroTitle'),
+  heroOverview: document.getElementById('heroOverview'),
+  heroPlayBtn: document.getElementById('heroPlayBtn'),
+  heroInfoBtn: document.getElementById('heroInfoBtn'),
+  heroFavBtn: document.getElementById('heroFavBtn'),
+  heroIndicators: document.getElementById('heroIndicators'),
+
+  // Shelves & Filters
+  filterPills: document.querySelectorAll('.pill-btn'),
+  navItems: document.querySelectorAll('.nav-item, .mobile-nav-item'),
+  watchlistCount: document.getElementById('watchlistCount'),
+  continueShelf: document.getElementById('continueShelf'),
+  continueRail: document.getElementById('continueRail'),
+  dynamicShelvesContainer: document.getElementById('dynamicShelvesContainer'),
+
+  // Modal
+  detailsModal: document.getElementById('detailsModal'),
+  modalBackdropClick: document.getElementById('modalBackdropClick'),
+  modalCloseBtn: document.getElementById('modalCloseBtn'),
+  modalHeroBanner: document.getElementById('modalHeroBanner'),
+  modalPoster: document.getElementById('modalPoster'),
+  modalTitle: document.getElementById('modalTitle'),
+  modalTypeTag: document.getElementById('modalTypeTag'),
+  modalRating: document.getElementById('modalRating'),
+  modalYear: document.getElementById('modalYear'),
+  modalGenres: document.getElementById('modalGenres'),
+  modalOverview: document.getElementById('modalOverview'),
+  modalDirectPlayBtn: document.getElementById('modalDirectPlayBtn'),
+  modalFavBtn: document.getElementById('modalFavBtn'),
+  modalSeriesSection: document.getElementById('modalSeriesSection'),
+  seasonsSelect: document.getElementById('seasonsSelect'),
+  modalEpisodesGrid: document.getElementById('modalEpisodesGrid'),
+
+  // Player
+  webPlayer: document.getElementById('webPlayer'),
+  mainVideo: document.getElementById('mainVideoPlayer'),
+  playerTopBar: document.getElementById('playerTopBar'),
+  playerBottomBar: document.getElementById('playerBottomBar'),
+  playerBackBtn: document.getElementById('playerBackBtn'),
+  playerItemTitle: document.getElementById('playerItemTitle'),
+  playerItemEpisode: document.getElementById('playerItemEpisode'),
+  playerQualityPill: document.getElementById('playerQualityPill'),
+  playerActiveQuality: document.getElementById('playerActiveQuality'),
+  qualityDropdown: document.getElementById('qualityDropdown'),
+  playerSubtitlesBtn: document.getElementById('playerSubtitlesBtn'),
+  playerEpisodesDrawerBtn: document.getElementById('playerEpisodesDrawerBtn'),
+  playerFullscreenBtn: document.getElementById('playerFullscreenBtn'),
+  playerCenterOverlay: document.getElementById('playerCenterOverlay'),
+  playerCenterPlayBtn: document.getElementById('playerCenterPlayBtn'),
+  centerPlayIcon: document.getElementById('centerPlayIcon'),
+  playerSpinner: document.getElementById('playerSpinner'),
+  rewindIndicator: document.getElementById('rewindIndicator'),
+  forwardIndicator: document.getElementById('forwardIndicator'),
+  activeSubtitleText: document.getElementById('activeSubtitleText'),
+  timelineContainer: document.getElementById('timelineContainer'),
+  timelineBufferBar: document.getElementById('timelineBufferBar'),
+  timelinePlayedBar: document.getElementById('timelinePlayedBar'),
+  timelineHandle: document.getElementById('timelineHandle'),
+  playerPlayPauseBtn: document.getElementById('playerPlayPauseBtn'),
+  bottomPlayIcon: document.getElementById('bottomPlayIcon'),
+  playerRewind10Btn: document.getElementById('playerRewind10Btn'),
+  playerForward10Btn: document.getElementById('playerForward10Btn'),
+  playerCurrentTime: document.getElementById('playerCurrentTime'),
+  playerDuration: document.getElementById('playerDuration'),
+  playerNextEpBtn: document.getElementById('playerNextEpBtn'),
+  playerEpisodesDrawer: document.getElementById('playerEpisodesDrawer'),
+  drawerSeriesTitle: document.getElementById('drawerSeriesTitle'),
+  drawerCloseBtn: document.getElementById('drawerCloseBtn'),
+  drawerEpisodesList: document.getElementById('drawerEpisodesList'),
+  playerSubtitlesModal: document.getElementById('playerSubtitlesModal'),
+  subtitlesModalCloseBtn: document.getElementById('subtitlesModalCloseBtn'),
+  subtitlesList: document.getElementById('subtitlesList'),
+
+  toast: document.getElementById('toast')
+};
+
+let hlsInstance = null;
+let controlsTimeout = null;
+let searchTimeout = null;
+let isScrubbing = false;
+
+// --------------------------------------------------------------------------
+// Initialization & Home Feed Loader
+// --------------------------------------------------------------------------
+async function initApp() {
+  updateWatchlistCount();
+  setupEventListeners();
+  renderContinueWatching();
+
+  try {
+    const res = await fetch(`${API_BASE}/api/home`);
+    const data = await res.json();
+
+    if (data.success) {
+      state.banners = data.banners || [];
+      state.shelves = data.shelves || [];
+
+      renderHeroBanner();
+      renderShelves();
+    } else {
+      showToast('تعذر جلب الأعمال الحالية، جاري إعادة المحاولة...');
+    }
+  } catch (err) {
+    console.error('Home feed error:', err);
+    DOM.dynamicShelvesContainer.innerHTML = `
+      <div class="section-container" style="text-align:center; padding: 60px 20px;">
+        <h3 style="color:#fff; margin-bottom:12px;">تعذر الاتصال بسيرفر البث</h3>
+        <p style="color:var(--text-muted); margin-bottom:20px;">يرجى التحقق من اتصال الإنترنت والضغط على زر التحديث</p>
+        <button class="btn-play-hero" onclick="location.reload()" style="margin: 0 auto;">إعادة المحاولة ↻</button>
+      </div>
+    `;
+  }
+}
+
+// --------------------------------------------------------------------------
+// Hero Banner Carousel
+// --------------------------------------------------------------------------
+function renderHeroBanner() {
+  if (!state.banners.length) return;
+
+  const b = state.banners[state.currentHeroIdx];
+  const bgImg = b.backdrop || b.poster || '';
+  
+  DOM.heroBackdrop.style.backgroundImage = `url('${bgImg}')`;
+  DOM.heroTypeBadge.textContent = b.isSeries ? 'مسلسل حصري' : 'فيلم سينمائي';
+  DOM.heroRatingBadge.textContent = `★ ${b.rating || '8.5'}`;
+  DOM.heroYearBadge.textContent = b.releaseYear || '2026';
+  DOM.heroTitle.textContent = b.titleAr || b.title;
+  DOM.heroOverview.textContent = b.genre ? `التصنيف: ${b.genre} • استمتع بالمشاهدة الحصرية الفورية بدقة 1080p FHD وبدون إعلانات.` : '';
+
+  // Update Favorite button state
+  const isFav = state.watchlist.some(w => String(w.id || w.subjectId) === String(b.id || b.subjectId));
+  DOM.heroFavBtn.classList.toggle('active', isFav);
+
+  // Indicators
+  DOM.heroIndicators.innerHTML = state.banners.map((_, i) => 
+    `<div class="hero-dot ${i === state.currentHeroIdx ? 'active' : ''}" data-idx="${i}"></div>`
+  ).join('');
+
+  DOM.heroIndicators.querySelectorAll('.hero-dot').forEach(dot => {
+    dot.addEventListener('click', () => {
+      state.currentHeroIdx = parseInt(dot.dataset.idx, 10);
+      renderHeroBanner();
+      restartHeroTimer();
+    });
+  });
+
+  restartHeroTimer();
+}
+
+function restartHeroTimer() {
+  clearInterval(state.heroTimer);
+  state.heroTimer = setInterval(() => {
+    if (!state.banners.length) return;
+    state.currentHeroIdx = (state.currentHeroIdx + 1) % state.banners.length;
+    renderHeroBanner();
+  }, 6500);
+}
+
+// --------------------------------------------------------------------------
+// Shelves & Movie Cards Rendering
+// --------------------------------------------------------------------------
+function renderShelves() {
+  if (!state.shelves.length) return;
+
+  let filteredShelves = state.shelves;
+
+  if (state.activeFilter === 'series') {
+    filteredShelves = state.shelves.filter(s => s.title.includes('مسلسل') || s.title.includes('دراما') || s.title.includes('Series'));
+  } else if (state.activeFilter === 'movies') {
+    filteredShelves = state.shelves.filter(s => s.title.includes('أفلام') || s.title.includes('فيلم') || s.title.includes('Movies'));
+  } else if (state.activeFilter === 'anime') {
+    filteredShelves = state.shelves.filter(s => s.title.includes('أنمي') || s.title.includes('Anime'));
+  } else if (state.activeFilter === 'arabic') {
+    filteredShelves = state.shelves.filter(s => s.title.includes('رمضان') || s.title.includes('عربي') || s.title.includes('Arabic'));
+  } else if (state.activeFilter === 'cartoon') {
+    filteredShelves = state.shelves.filter(s => s.title.includes('كارتون') || s.title.includes('رسوم') || s.title.includes('Animation'));
+  } else if (state.activeFilter === 'watchlist') {
+    renderWatchlistView();
+    return;
+  }
+
+  DOM.dynamicShelvesContainer.innerHTML = filteredShelves.map((shelf, sIdx) => {
+    const items = shelf.items || [];
+    if (!items.length) return '';
+
+    return `
+      <section class="shelf-section">
+        <div class="section-container">
+          <div class="shelf-header">
+            <h2 class="shelf-title">
+              <span class="shelf-emoji">${getShelfEmoji(shelf.title)}</span>
+              <span>${shelf.title}</span>
+            </h2>
+          </div>
+          <div class="rail-container">
+            <div class="cards-rail" id="shelf_rail_${sIdx}">
+              ${items.map(item => renderMovieCardHtml(item)).join('')}
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+  }).join('');
+
+  attachCardClickHandlers();
+}
+
+function getShelfEmoji(title) {
+  if (title.includes('رائج') || title.includes('Trending')) return '🔥';
+  if (title.includes('مسلسل') || title.includes('Series')) return '📺';
+  if (title.includes('أنمي') || title.includes('Anime')) return '⚔️';
+  if (title.includes('رمضان') || title.includes('دراما')) return '🌙';
+  if (title.includes('أفلام') || title.includes('Movies')) return '🎬';
+  if (title.includes('كارتون') || title.includes('Animation')) return '🎨';
+  return '✨';
+}
+
+function renderMovieCardHtml(item) {
+  const title = item.titleAr || item.title;
+  const poster = item.poster || item.backdrop || 'assets/images/logo.png';
+  const rating = item.rating || 8.0;
+  const typeLabel = item.isSeries ? 'مسلسل' : 'فيلم';
+  
+  // Progress bar if in continue watching
+  const progKey = `${item.subjectId || item.id}_0_0`;
+  const prog = state.watchProgress[progKey];
+  const percent = prog ? Math.min(100, Math.round((prog.time / prog.duration) * 100)) : 0;
+
+  return `
+    <div class="movie-card" data-id="${item.subjectId || item.id}" data-path="${item.detailPath || ''}">
+      <div class="poster-wrap">
+        <img src="${poster}" alt="${title}" class="poster-img" loading="lazy">
+        <span class="card-quality-badge">1080p FHD</span>
+        <span class="card-rating-badge">★ ${rating}</span>
+        <div class="card-hover-play">
+          <div class="play-circle-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+        </div>
+        ${percent > 0 ? `
+          <div class="card-progress-bar-bg">
+            <div class="card-progress-bar-fill" style="width: ${percent}%;"></div>
+          </div>
+        ` : ''}
+      </div>
+      <div class="card-info">
+        <h4 class="card-title-ar" title="${title}">${title}</h4>
+        <div class="card-meta-row">
+          <span class="card-type-label">${typeLabel}</span>
+          <span>${item.releaseYear || '2026'}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function attachCardClickHandlers() {
+  document.querySelectorAll('.movie-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const id = card.dataset.id;
+      const detailPath = card.dataset.path;
+      openDetailsModal(id, detailPath);
+    });
+  });
+}
+
+// --------------------------------------------------------------------------
+// Continue Watching (حيث توقفت)
+// --------------------------------------------------------------------------
+function renderContinueWatching() {
+  const keys = Object.keys(state.watchProgress);
+  if (!keys.length) {
+    DOM.continueShelf.style.display = 'none';
+    return;
+  }
+
+  const items = [];
+  for (const k of keys.reverse()) {
+    const prog = state.watchProgress[k];
+    if (prog && prog.item) {
+      items.push(prog.item);
+    }
+  }
+
+  if (!items.length) {
+    DOM.continueShelf.style.display = 'none';
+    return;
+  }
+
+  DOM.continueShelf.style.display = 'block';
+  DOM.continueRail.innerHTML = items.slice(0, 10).map(item => renderMovieCardHtml(item)).join('');
+  attachCardClickHandlers();
+}
+
+// --------------------------------------------------------------------------
+// Watchlist (قائمتي المفضلة)
+// --------------------------------------------------------------------------
+function updateWatchlistCount() {
+  DOM.watchlistCount.textContent = state.watchlist.length;
+}
+
+function renderWatchlistView() {
+  if (!state.watchlist.length) {
+    DOM.dynamicShelvesContainer.innerHTML = `
+      <div class="section-container" style="text-align: center; padding: 70px 20px;">
+        <div style="font-size: 48px; margin-bottom: 16px;">🔖</div>
+        <h3 style="font-family: var(--font-display); font-size: 24px; color: #fff; margin-bottom: 10px;">قائمتك المفضلة فارغة حالياً</h3>
+        <p style="color: var(--text-muted); font-size: 14px; max-width: 400px; margin: 0 auto 24px auto;">
+          تصفح الأعمال واضغط على أيقونة الإشارة المرجعية لإضافتها إلى قائمتك والوصول إليها بسرعة من أي جهاز.
+        </p>
+        <button class="pill-btn active" data-filter="all" onclick="document.querySelector('[data-filter=all]').click()" style="margin: 0 auto;">تصفح كل الأعمال الآن</button>
+      </div>
+    `;
+    return;
+  }
+
+  DOM.dynamicShelvesContainer.innerHTML = `
+    <section class="shelf-section">
+      <div class="section-container">
+        <div class="shelf-header">
+          <h2 class="shelf-title">
+            <span class="shelf-emoji">🔖</span>
+            <span>قائمتي المفضلة (${state.watchlist.length} عمل)</span>
+          </h2>
+        </div>
+        <div class="posters-grid">
+          ${state.watchlist.map(item => renderMovieCardHtml(item)).join('')}
+        </div>
+      </div>
+    </section>
+  `;
+
+  attachCardClickHandlers();
+}
+
+function toggleWatchlist(item) {
+  if (!item) return;
+  const id = String(item.subjectId || item.id);
+  const idx = state.watchlist.findIndex(w => String(w.subjectId || w.id) === id);
+
+  if (idx >= 0) {
+    state.watchlist.splice(idx, 1);
+    showToast('تمت الإزالة من قائمتي المفضلة');
+  } else {
+    state.watchlist.push(item);
+    showToast('تمت الإضافة إلى قائمتي المفضلة ✓');
+  }
+
+  localStorage.setItem('cf_web_watchlist', JSON.stringify(state.watchlist));
+  updateWatchlistCount();
+
+  if (state.activeFilter === 'watchlist') {
+    renderWatchlistView();
+  }
+}
+
+// --------------------------------------------------------------------------
+// Real-Time Instant Search
+// --------------------------------------------------------------------------
+function handleSearch(query) {
+  const q = query.trim();
+  if (!q) {
+    DOM.searchView.style.display = 'none';
+    DOM.catalogView.style.display = 'block';
+    DOM.clearSearchBtn.style.display = 'none';
+    return;
+  }
+
+  DOM.clearSearchBtn.style.display = 'block';
+  DOM.searchTermText.textContent = `"${q}"`;
+  DOM.searchView.style.display = 'block';
+  DOM.catalogView.style.display = 'none';
+
+  DOM.searchResultsGrid.innerHTML = `
+    <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">
+      جاري البحث في قاعدة بيانات سينما فوكس...
+    </div>
+  `;
+
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      const results = data.results || [];
+
+      DOM.searchResultsCount.textContent = `${results.length} عمل`;
+
+      if (!results.length) {
+        DOM.searchResultsGrid.innerHTML = `
+          <div style="grid-column: 1 / -1; text-align: center; padding: 50px 20px;">
+            <div style="font-size: 38px; margin-bottom: 12px;">🔍</div>
+            <h4 style="color:#fff; margin-bottom: 8px;">لم نتمكن من العثور على "${q}"</h4>
+            <p style="color:var(--text-muted); font-size: 13px;">تأكد من كتابة الاسم باللغة العربية أو الإنجليزية بدقة</p>
+          </div>
+        `;
+        return;
+      }
+
+      DOM.searchResultsGrid.innerHTML = results.map(item => renderMovieCardHtml(item)).join('');
+      attachCardClickHandlers();
+    } catch (err) {
+      console.error('Search error:', err);
+    }
+  }, 350);
+}
+
+// --------------------------------------------------------------------------
+// Details Modal & Season/Episode Resolution
+// --------------------------------------------------------------------------
+async function openDetailsModal(subjectId, detailPath) {
+  // Find item from banners or shelves
+  let item = state.banners.find(b => String(b.subjectId || b.id) === String(subjectId));
+  if (!item) {
+    for (const s of state.shelves) {
+      const found = (s.items || []).find(m => String(m.subjectId || m.id) === String(subjectId));
+      if (found) { item = found; break; }
+    }
+  }
+
+  state.modalItem = item || { subjectId, detailPath, title: 'تحميل...', isSeries: false };
+
+  // Populate basic modal info first
+  const bg = item?.backdrop || item?.poster || '';
+  DOM.modalHeroBanner.style.backgroundImage = `url('${bg}')`;
+  DOM.modalPoster.src = item?.poster || item?.backdrop || 'assets/images/logo.png';
+  DOM.modalTitle.textContent = item?.titleAr || item?.title || 'تفاصيل العمل';
+  DOM.modalTypeTag.textContent = item?.isSeries ? 'مسلسل' : 'فيلم';
+  DOM.modalRating.textContent = `★ ${item?.rating || '8.5'}`;
+  DOM.modalYear.textContent = item?.releaseYear || '2026';
+  DOM.modalGenres.textContent = item?.genre || 'أفلام ومسلسلات';
+  DOM.modalOverview.textContent = 'جاري جلب نبذة العمل وسيرفرات البث بدقة 1080p FHD...';
+
+  // Watchlist state
+  const isFav = state.watchlist.some(w => String(w.subjectId || w.id) === String(subjectId));
+  DOM.modalFavBtn.classList.toggle('active', isFav);
+
+  DOM.detailsModal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  // Fetch full details & seasons from Vercel Edge API
+  try {
+    const url = `${API_BASE}/api/detail?subjectId=${encodeURIComponent(subjectId)}&detailPath=${encodeURIComponent(detailPath || '')}`;
+    const res = await fetch(url);
+    const json = await res.json();
+
+    if (json.success && json.data) {
+      state.modalDetails = json.data;
+      const d = json.data;
+
+      DOM.modalTitle.textContent = d.titleAr || d.title;
+      if (d.synopsis) DOM.modalOverview.textContent = d.synopsis;
+      if (d.backdrop) DOM.modalHeroBanner.style.backgroundImage = `url('${d.backdrop}')`;
+      if (d.poster) DOM.modalPoster.src = d.poster;
+
+      if (d.isSeries && d.seasons && d.seasons.length > 0) {
+        DOM.modalSeriesSection.style.display = 'block';
+        DOM.seasonsSelect.innerHTML = d.seasons.map((s, idx) => 
+          `<option value="${idx}">الموسم ${s.seasonNumber} (${s.episodeCount} حلقة)</option>`
+        ).join('');
+
+        renderModalEpisodes(d.seasons[0]);
+
+        DOM.seasonsSelect.onchange = (e) => {
+          const sIdx = parseInt(e.target.value, 10);
+          renderModalEpisodes(d.seasons[sIdx]);
+        };
+      } else {
+        DOM.modalSeriesSection.style.display = 'none';
+      }
+    }
+  } catch (e) {
+    console.error('Detail fetch error:', e);
+  }
+}
+
+function renderModalEpisodes(seasonObj) {
+  if (!seasonObj || !seasonObj.episodes) return;
+
+  DOM.modalEpisodesGrid.innerHTML = seasonObj.episodes.map(ep => {
+    const sNum = seasonObj.seasonNumber || 1;
+    const epNum = ep.number || 1;
+    const progKey = `${state.modalItem.subjectId || state.modalItem.id}_${sNum}_${epNum}`;
+    const prog = state.watchProgress[progKey];
+    const isDone = prog && (prog.time / prog.duration) > 0.85;
+
+    return `
+      <button class="episode-card-btn ${isDone ? 'done' : ''}" data-season="${sNum}" data-ep="${epNum}">
+        <span class="ep-num">الحلقة ${epNum}</span>
+        <span class="ep-label">${isDone ? '✓ تمت المشاهدة' : (ep.title || 'تشغيل فوراً')}</span>
+      </button>
+    `;
+  }).join('');
+
+  DOM.modalEpisodesGrid.querySelectorAll('.episode-card-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const se = parseInt(btn.dataset.season, 10);
+      const ep = parseInt(btn.dataset.ep, 10);
+      closeModal();
+      startPlayback(state.modalItem, se, ep);
+    });
+  });
+}
+
+function closeModal() {
+  DOM.detailsModal.classList.remove('open');
+  document.body.style.overflow = 'auto';
+}
+
+// --------------------------------------------------------------------------
+// Full Web Video Player (HTML5 + HLS.js + 1080p Stream Switching)
+// --------------------------------------------------------------------------
+async function startPlayback(item, season = 0, episode = 0) {
+  if (!item) return;
+
+  state.playing.item = item;
+  state.playing.season = season;
+  state.playing.episode = episode;
+
+  // Open player overlay
+  DOM.webPlayer.classList.add('active');
+  DOM.playerSpinner.style.display = 'block';
+  DOM.centerPlayIcon.style.display = 'none';
+
+  const title = item.titleAr || item.title;
+  DOM.playerItemTitle.textContent = title;
+  DOM.playerItemEpisode.textContent = item.isSeries ? `الموسم ${season} : الحلقة ${episode}` : 'فيلم كامل (1080p FHD)';
+
+  // Set episode drawer button visibility
+  if (item.isSeries) {
+    DOM.playerEpisodesDrawerBtn.style.display = 'flex';
+    DOM.drawerSeriesTitle.textContent = `${title} • الحلقات`;
+  } else {
+    DOM.playerEpisodesDrawerBtn.style.display = 'none';
+  }
+
+  // Request streams from Vercel Edge API
+  try {
+    const streamUrl = `${API_BASE}/api/streams?subjectId=${encodeURIComponent(item.subjectId || item.id)}&se=${season}&ep=${episode}&detailPath=${encodeURIComponent(item.detailPath || '')}`;
+    const res = await fetch(streamUrl);
+    const data = await res.json();
+
+    if (data.success && data.streams && data.streams.length > 0) {
+      state.playing.streams = data.streams;
+      
+      // Select best stream (1080p first)
+      const primaryStream = data.streams[0];
+      state.playing.activeStreamUrl = primaryStream.url;
+      DOM.playerActiveQuality.textContent = `${primaryStream.resolution} FHD`;
+
+      // Build quality dropdown
+      DOM.qualityDropdown.innerHTML = data.streams.map((s, idx) => 
+        `<button class="quality-opt-btn" data-url="${s.url}" data-res="${s.resolution}">${s.resolution} ${idx === 0 ? '(الأعلى دقة)' : ''}</button>`
+      ).join('');
+
+      DOM.qualityDropdown.querySelectorAll('.quality-opt-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          switchStreamQuality(btn.dataset.url, btn.dataset.res);
+        });
+      });
+
+      // Load Stream into Video
+      loadVideoSource(primaryStream.url);
+
+      // Load Subtitles
+      loadSubtitles(item.subjectId || item.id, season, episode);
+
+    } else {
+      showToast('عذراً، سيرفرات البث مشغولة حالياً لهذا العمل. جاري المحاولة بسيرفر بديل...');
+      DOM.playerSpinner.style.display = 'none';
+    }
+  } catch (err) {
+    console.error('Stream load error:', err);
+    showToast('حدث خطأ في تحميل البث المباشر');
+    DOM.playerSpinner.style.display = 'none';
+  }
+}
+
+function loadVideoSource(url) {
+  const video = DOM.mainVideo;
+
+  if (hlsInstance) {
+    hlsInstance.destroy();
+    hlsInstance = null;
+  }
+
+  // Check if HLS (.m3u8)
+  if (url.includes('.m3u8')) {
+    if (Hls.isSupported()) {
+      hlsInstance = new Hls({
+        capLevelToPlayerSize: true,
+        autoStartLoad: true
+      });
+      hlsInstance.loadSource(url);
+      hlsInstance.attachMedia(video);
+      hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(() => {});
+        checkResumePlayback();
+      });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = url;
+      video.play().catch(() => {});
+      checkResumePlayback();
+    }
+  } else {
+    // Direct MP4 / WebM
+    video.src = url;
+    video.play().catch(() => {});
+    checkResumePlayback();
+  }
+
+  resetControlsTimer();
+}
+
+function switchStreamQuality(newUrl, resLabel) {
+  DOM.qualityDropdown.classList.remove('show');
+  DOM.playerActiveQuality.textContent = resLabel;
+
+  const curTime = DOM.mainVideo.currentTime;
+  const isPlaying = !DOM.mainVideo.paused;
+
+  loadVideoSource(newUrl);
+
+  DOM.mainVideo.addEventListener('loadedmetadata', function onMeta() {
+    DOM.mainVideo.currentTime = curTime;
+    if (isPlaying) DOM.mainVideo.play().catch(() => {});
+    DOM.mainVideo.removeEventListener('loadedmetadata', onMeta);
+  });
+
+  showToast(`تم التبديل إلى دقة ${resLabel}`);
+}
+
+function checkResumePlayback() {
+  const item = state.playing.item;
+  if (!item) return;
+
+  const key = `${item.subjectId || item.id}_${state.playing.season}_${state.playing.episode}`;
+  const prog = state.watchProgress[key];
+
+  if (prog && prog.time > 15 && prog.time < (prog.duration - 45)) {
+    DOM.mainVideo.currentTime = prog.time;
+    showToast(`تم استئناف المشاهدة من ${formatTime(prog.time)} ✓`);
+  }
+}
+
+function closePlayer() {
+  DOM.mainVideo.pause();
+  DOM.mainVideo.src = '';
+  if (hlsInstance) {
+    hlsInstance.destroy();
+    hlsInstance = null;
+  }
+  DOM.webPlayer.classList.remove('active');
+  DOM.activeSubtitleText.textContent = '';
+  document.body.style.overflow = 'auto';
+
+  // Refresh continue watching rail
+  renderContinueWatching();
+}
+
+// --------------------------------------------------------------------------
+// Subtitles Engine
+// --------------------------------------------------------------------------
+async function loadSubtitles(subjectId, season, episode) {
+  try {
+    const url = `${API_BASE}/api/subtitles?subjectId=${encodeURIComponent(subjectId)}&se=${season}&ep=${episode}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.success && data.subtitles && data.subtitles.length > 0) {
+      state.playing.subtitles = data.subtitles;
+
+      // Select Arabic subtitle by default if available
+      const arSub = data.subtitles.find(s => s.isArabic);
+      if (arSub) {
+        activateSubtitle(arSub);
+      }
+
+      // Build Subtitles modal list
+      DOM.subtitlesList.innerHTML = `
+        <button class="sub-opt-btn ${!arSub ? 'active' : ''}" data-id="off">إيقاف الترجمة (Off)</button>
+        ${data.subtitles.map(s => `
+          <button class="sub-opt-btn ${s === arSub ? 'active' : ''}" data-url="${s.url}" data-lang="${s.language}">
+            ${s.label} ${s.isArabic ? '(العربية الافتراضية)' : ''}
+          </button>
+        `).join('')}
+      `;
+
+      DOM.subtitlesList.querySelectorAll('.sub-opt-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          DOM.playerSubtitlesModal.style.display = 'none';
+          if (btn.dataset.id === 'off') {
+            state.playing.subCues = [];
+            DOM.activeSubtitleText.textContent = '';
+            showToast('تم إيقاف الترجمة');
+          } else {
+            const sub = state.playing.subtitles.find(s => s.url === btn.dataset.url);
+            if (sub) activateSubtitle(sub);
+          }
+        });
+      });
+    }
+  } catch (err) {
+    console.error('Subtitle load error:', err);
+  }
+}
+
+async function activateSubtitle(subObj) {
+  state.playing.activeSubtitleTrack = subObj;
+  try {
+    const res = await fetch(subObj.url);
+    const text = await res.text();
+    state.playing.subCues = parseVttOrSrt(text);
+    showToast(`تم تفعيل ترجمة: ${subObj.label}`);
+  } catch (e) {
+    console.error('Subtitle parse error:', e);
+  }
+}
+
+function parseVttOrSrt(content) {
+  const cues = [];
+  const lines = content.replace(/\r\n/g, '\n').split('\n');
+  let i = 0;
+
+  while (i < lines.length) {
+    let line = lines[i].trim();
+    if (line.includes('-->')) {
+      const parts = line.split('-->');
+      const start = parseTimestamp(parts[0].trim());
+      const end = parseTimestamp(parts[1].trim().split(' ')[0]);
+      let cueText = '';
+      i++;
+      while (i < lines.length && lines[i].trim() !== '') {
+        cueText += (cueText ? ' ' : '') + lines[i].trim();
+        i++;
+      }
+      if (cueText) {
+        cues.push({ start, end, text: cueText.replace(/<[^>]+>/g, '') });
+      }
+    }
+    i++;
+  }
+  return cues;
+}
+
+function parseTimestamp(str) {
+  const parts = str.split(':');
+  if (parts.length === 3) {
+    const secParts = parts[2].split(/[.,]/);
+    return parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseInt(secParts[0], 10) + (parseInt(secParts[1] || '0', 10) / 1000);
+  } else if (parts.length === 2) {
+    const secParts = parts[1].split(/[.,]/);
+    return parseInt(parts[0], 10) * 60 + parseInt(secParts[0], 10) + (parseInt(secParts[1] || '0', 10) / 1000);
+  }
+  return 0;
+}
+
+// --------------------------------------------------------------------------
+// Video TimeUpdate & Subtitle Sync
+// --------------------------------------------------------------------------
+DOM.mainVideo.addEventListener('timeupdate', () => {
+  const cur = DOM.mainVideo.currentTime;
+  const dur = DOM.mainVideo.duration || 0;
+
+  if (!isScrubbing && dur > 0) {
+    const percent = (cur / dur) * 100;
+    DOM.timelinePlayedBar.style.width = `${percent}%`;
+    DOM.playerCurrentTime.textContent = formatTime(cur);
+    DOM.playerDuration.textContent = formatTime(dur);
+  }
+
+  // Update buffer bar
+  if (DOM.mainVideo.buffered.length > 0 && dur > 0) {
+    const buffEnd = DOM.mainVideo.buffered.end(DOM.mainVideo.buffered.length - 1);
+    DOM.timelineBufferBar.style.width = `${(buffEnd / dur) * 100}%`;
+  }
+
+  // Subtitle synchronization
+  if (state.playing.subCues && state.playing.subCues.length > 0) {
+    const match = state.playing.subCues.find(c => cur >= c.start && cur <= c.end);
+    DOM.activeSubtitleText.textContent = match ? match.text : '';
+  }
+
+  // Save Progress periodically (every ~5 seconds)
+  if (Math.floor(cur) % 5 === 0 && dur > 0) {
+    savePlaybackProgress(cur, dur);
+  }
+});
+
+function savePlaybackProgress(time, duration) {
+  const item = state.playing.item;
+  if (!item) return;
+
+  const key = `${item.subjectId || item.id}_${state.playing.season}_${state.playing.episode}`;
+  state.watchProgress[key] = {
+    item: item,
+    season: state.playing.season,
+    episode: state.playing.episode,
+    time: Math.round(time),
+    duration: Math.round(duration),
+    timestamp: Date.now()
+  };
+
+  localStorage.setItem('cf_web_progress', JSON.stringify(state.watchProgress));
+}
+
+// Play/Pause State Watchers
+DOM.mainVideo.addEventListener('play', () => {
+  DOM.centerPlayIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+  DOM.bottomPlayIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+  DOM.playerSpinner.style.display = 'none';
+  resetControlsTimer();
+});
+
+DOM.mainVideo.addEventListener('pause', () => {
+  DOM.centerPlayIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+  DOM.bottomPlayIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+  showControls();
+});
+
+DOM.mainVideo.addEventListener('waiting', () => {
+  DOM.playerSpinner.style.display = 'block';
+});
+
+DOM.mainVideo.addEventListener('canplay', () => {
+  DOM.playerSpinner.style.display = 'none';
+});
+
+// --------------------------------------------------------------------------
+// Controls Visibility & Gestures (Double-Tap to Fullscreen / Dismiss)
+// --------------------------------------------------------------------------
+function resetControlsTimer() {
+  clearTimeout(controlsTimeout);
+  DOM.webPlayer.classList.remove('controls-hidden');
+
+  if (!DOM.mainVideo.paused) {
+    controlsTimeout = setTimeout(() => {
+      DOM.webPlayer.classList.add('controls-hidden');
+    }, 3500);
+  }
+}
+
+function showControls() {
+  clearTimeout(controlsTimeout);
+  DOM.webPlayer.classList.remove('controls-hidden');
+}
+
+function toggleControls() {
+  if (DOM.webPlayer.classList.contains('controls-hidden')) {
+    showControls();
+    resetControlsTimer();
+  } else {
+    DOM.webPlayer.classList.add('controls-hidden');
+    clearTimeout(controlsTimeout);
+  }
+}
+
+// Double-Tap and Tap Gestures
+let lastClickTime = 0;
+DOM.webPlayer.addEventListener('click', (e) => {
+  // If clicking on specific control buttons, don't trigger background click
+  if (e.target.closest('.player-top-bar') || e.target.closest('.player-bottom-bar') || e.target.closest('.player-episodes-drawer') || e.target.closest('.player-subtitles-modal')) {
+    return;
+  }
+
+  const now = Date.now();
+  const diff = now - lastClickTime;
+  lastClickTime = now;
+
+  if (diff < 300) {
+    // DOUBLE TAP!
+    const rect = DOM.webPlayer.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const w = rect.width;
+
+    if (x < w * 0.35) {
+      // Seek -10s
+      seekRelative(-10);
+      triggerIndicator(DOM.rewindIndicator);
+    } else if (x > w * 0.65) {
+      // Seek +10s
+      seekRelative(10);
+      triggerIndicator(DOM.forwardIndicator);
+    } else {
+      // Center Double-Tap: Instantly toggle fullscreen and hide all controls!
+      toggleFullscreen();
+      DOM.webPlayer.classList.add('controls-hidden');
+    }
+  } else {
+    // Single Tap: Toggle controls visibility immediately!
+    toggleControls();
+  }
+});
+
+function triggerIndicator(elem) {
+  elem.classList.add('active');
+  setTimeout(() => elem.classList.remove('active'), 500);
+}
+
+function seekRelative(sec) {
+  DOM.mainVideo.currentTime = Math.max(0, Math.min(DOM.mainVideo.duration, DOM.mainVideo.currentTime + sec));
+  resetControlsTimer();
+}
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    DOM.webPlayer.requestFullscreen().catch(() => {});
+  } else {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+
+// Timeline Scrubber Click & Drag
+DOM.timelineContainer.addEventListener('mousedown', (e) => {
+  isScrubbing = true;
+  seekToPosition(e);
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (isScrubbing) seekToPosition(e);
+});
+
+window.addEventListener('mouseup', () => {
+  if (isScrubbing) {
+    isScrubbing = false;
+    resetControlsTimer();
+  }
+});
+
+DOM.timelineContainer.addEventListener('touchstart', (e) => {
+  isScrubbing = true;
+  seekToPosition(e.touches[0]);
+});
+
+window.addEventListener('touchmove', (e) => {
+  if (isScrubbing) seekToPosition(e.touches[0]);
+});
+
+window.addEventListener('touchend', () => {
+  if (isScrubbing) isScrubbing = false;
+});
+
+function seekToPosition(e) {
+  const rect = DOM.timelineContainer.getBoundingClientRect();
+  const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  // In RTL, 100% is on left
+  const rtlPos = 1 - pos;
+  if (DOM.mainVideo.duration) {
+    DOM.mainVideo.currentTime = DOM.mainVideo.duration * rtlPos;
+  }
+}
+
+// --------------------------------------------------------------------------
+// Event Listeners & Keyboard Shortcuts
+// --------------------------------------------------------------------------
+function setupEventListeners() {
+  // Brand logo click -> home
+  DOM.brandLogo.addEventListener('click', (e) => {
+    e.preventDefault();
+    DOM.searchInput.value = '';
+    handleSearch('');
+    document.querySelector('[data-filter=all]').click();
+  });
+
+  // Filter pills
+  DOM.filterPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      DOM.filterPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      state.activeFilter = pill.dataset.filter;
+      renderShelves();
+    });
+  });
+
+  // Desktop & Mobile Nav
+  DOM.navItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const filter = item.dataset.filter;
+      DOM.navItems.forEach(i => i.classList.remove('active'));
+      document.querySelectorAll(`[data-filter=${filter}]`).forEach(el => el.classList.add('active'));
+      state.activeFilter = filter;
+      renderShelves();
+    });
+  });
+
+  // Search
+  DOM.searchInput.addEventListener('input', (e) => handleSearch(e.target.value));
+  DOM.clearSearchBtn.addEventListener('click', () => {
+    DOM.searchInput.value = '';
+    handleSearch('');
+  });
+
+  // Hero Actions
+  DOM.heroPlayBtn.addEventListener('click', () => {
+    const b = state.banners[state.currentHeroIdx];
+    if (b) startPlayback(b);
+  });
+
+  DOM.heroInfoBtn.addEventListener('click', () => {
+    const b = state.banners[state.currentHeroIdx];
+    if (b) openDetailsModal(b.subjectId || b.id, b.detailPath);
+  });
+
+  DOM.heroFavBtn.addEventListener('click', () => {
+    const b = state.banners[state.currentHeroIdx];
+    if (b) toggleWatchlist(b);
+  });
+
+  // Modal Actions
+  DOM.modalBackdropClick.addEventListener('click', closeModal);
+  DOM.modalCloseBtn.addEventListener('click', closeModal);
+  DOM.modalDirectPlayBtn.addEventListener('click', () => {
+    closeModal();
+    startPlayback(state.modalItem);
+  });
+  DOM.modalFavBtn.addEventListener('click', () => {
+    toggleWatchlist(state.modalItem);
+  });
+
+  // Player Actions
+  DOM.playerBackBtn.addEventListener('click', closePlayer);
+  DOM.playerCenterPlayBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (DOM.mainVideo.paused) DOM.mainVideo.play().catch(() => {});
+    else DOM.mainVideo.pause();
+  });
+  DOM.playerPlayPauseBtn.addEventListener('click', () => {
+    if (DOM.mainVideo.paused) DOM.mainVideo.play().catch(() => {});
+    else DOM.mainVideo.pause();
+  });
+  DOM.playerRewind10Btn.addEventListener('click', () => seekRelative(-10));
+  DOM.playerForward10Btn.addEventListener('click', () => seekRelative(10));
+  DOM.playerFullscreenBtn.addEventListener('click', toggleFullscreen);
+
+  // Quality Dropdown Toggle
+  DOM.playerQualityPill.addEventListener('click', (e) => {
+    e.stopPropagation();
+    DOM.qualityDropdown.classList.toggle('show');
+  });
+
+  // Subtitles Modal Toggle
+  DOM.playerSubtitlesBtn.addEventListener('click', () => {
+    DOM.playerSubtitlesModal.style.display = 'block';
+  });
+  DOM.subtitlesModalCloseBtn.addEventListener('click', () => {
+    DOM.playerSubtitlesModal.style.display = 'none';
+  });
+
+  // Episodes Drawer Toggle
+  DOM.playerEpisodesDrawerBtn.addEventListener('click', () => {
+    DOM.playerEpisodesDrawer.classList.toggle('open');
+  });
+  DOM.drawerCloseBtn.addEventListener('click', () => {
+    DOM.playerEpisodesDrawer.classList.remove('open');
+  });
+
+  // Keyboard Shortcuts
+  window.addEventListener('keydown', (e) => {
+    // If typing in search box, ignore hotkeys
+    if (document.activeElement === DOM.searchInput) return;
+
+    if (DOM.webPlayer.classList.contains('active')) {
+      if (e.code === 'Space' || e.code === 'KeyK') {
+        e.preventDefault();
+        if (DOM.mainVideo.paused) DOM.mainVideo.play().catch(() => {});
+        else DOM.mainVideo.pause();
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        seekRelative(-10);
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        seekRelative(10);
+      } else if (e.code === 'KeyF') {
+        e.preventDefault();
+        toggleFullscreen();
+      } else if (e.code === 'KeyM') {
+        e.preventDefault();
+        DOM.mainVideo.muted = !DOM.mainVideo.muted;
+        showToast(DOM.mainVideo.muted ? 'تم كتم الصوت' : 'تم تشغيل الصوت');
+      } else if (e.code === 'Escape') {
+        closePlayer();
+      }
+    } else if (DOM.detailsModal.classList.contains('open') && e.code === 'Escape') {
+      closeModal();
+    }
+  });
+}
+
+// --------------------------------------------------------------------------
+// Utility Helpers
+// --------------------------------------------------------------------------
+function formatTime(sec) {
+  const s = Math.floor(sec || 0);
+  const hrs = Math.floor(s / 3600);
+  const mins = Math.floor((s % 3600) / 60);
+  const secs = s % 60;
+
+  if (hrs > 0) {
+    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+let toastTimer;
+function showToast(msg) {
+  clearTimeout(toastTimer);
+  DOM.toast.textContent = msg;
+  DOM.toast.classList.add('show');
+  toastTimer = setTimeout(() => {
+    DOM.toast.classList.remove('show');
+  }, 3200);
+}
+
+// Run app on load
+window.addEventListener('DOMContentLoaded', initApp);
