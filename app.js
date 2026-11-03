@@ -744,23 +744,15 @@ async function startPlayback(item, season = 0, episode = 0) {
   DOM.playerItemTitle.textContent = title;
   DOM.playerItemEpisode.textContent = item.isSeries ? `الموسم ${season || 1} : الحلقة ${episode || 1}` : 'فيلم كامل (1080p FHD)';
 
-  // Build clean theater stream URL
-  const isSeries = item.isSeries || (season > 0 && episode > 0);
-  const seNum = season > 0 ? season : 1;
-  const epNum = episode > 0 ? episode : 1;
-  const epQuery = isSeries ? `?se=${seNum}&ep=${epNum}` : '';
-  const detailPath = item.detailPath || `subject-${item.subjectId || item.id}`;
-
-  // High-performance Cinema Theater Stream (Without /ar/ to prevent flipped sidebar clutter on desktop)
-  const playUrl = `https://movieboxph.org/play/${encodeURIComponent(detailPath)}${epQuery}`;
-
+  // Activate our custom CinemaFox HTML5 video player and ensure external iframe is completely disabled
+  DOM.mainVideo.style.display = 'block';
   if (DOM.webPlayerIframe) {
-    DOM.webPlayerIframe.style.display = 'block';
-    DOM.webPlayerIframe.src = playUrl;
+    DOM.webPlayerIframe.style.display = 'none';
+    DOM.webPlayerIframe.src = 'about:blank';
   }
-  if (DOM.mainVideo) {
-    DOM.mainVideo.style.display = 'none';
-  }
+
+  // Show buffering spinner
+  DOM.playerSpinner.style.display = 'block';
 
   // Set episode drawer button visibility
   if (item.isSeries) {
@@ -770,8 +762,54 @@ async function startPlayback(item, season = 0, episode = 0) {
     DOM.playerEpisodesDrawerBtn.style.display = 'none';
   }
 
-  // Load Arabic Subtitles in parallel
-  loadSubtitles(item.subjectId || item.id, seNum, epNum);
+  const isSeries = item.isSeries || (season > 0 && episode > 0);
+  const seNum = season > 0 ? season : (isSeries ? 1 : 0);
+  const epNum = episode > 0 ? episode : (isSeries ? 1 : 0);
+  const detailPath = item.detailPath || `subject-${item.subjectId || item.id}`;
+
+  // 1. Load Arabic Subtitles in parallel with authentic detailPath
+  loadSubtitles(item.subjectId || item.id, seNum, epNum, detailPath);
+
+  // 2. Fetch and start video stream in our custom CinemaFox player
+  try {
+    const streamRes = await fetch(`${API_BASE}/api/streams?subjectId=${encodeURIComponent(item.subjectId || item.id)}&se=${seNum}&ep=${epNum}&detailPath=${encodeURIComponent(detailPath)}&title=${encodeURIComponent(item.title || '')}`);
+    const streamData = await streamRes.json();
+
+    if (streamData.success && streamData.streams && streamData.streams.length > 0) {
+      state.playing.streams = streamData.streams;
+      const bestStream = streamData.streams[0]; // Highest resolution (1080p / 720p)
+
+      // Check for user-defined Cloudflare Stream Worker or fallback
+      const customWorker = localStorage.getItem('cf_stream_worker') || '';
+      const streamSrc = customWorker 
+        ? `${customWorker}?url=${encodeURIComponent(bestStream.url)}` 
+        : (bestStream.proxyUrl || bestStream.url);
+
+      DOM.mainVideo.src = streamSrc;
+      DOM.mainVideo.load();
+
+      const playPromise = DOM.mainVideo.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          DOM.playerSpinner.style.display = 'none';
+          updatePlayPauseIcons(true);
+        }).catch(err => {
+          console.warn('Autoplay waiting for user tap:', err);
+          DOM.playerSpinner.style.display = 'none';
+          updatePlayPauseIcons(false);
+        });
+      }
+
+      showToast(`🎬 تشغيل ${title} (${bestStream.resolution || '1080p FHD'})`);
+    } else {
+      DOM.playerSpinner.style.display = 'none';
+      showToast('⚠️ جاري تجهيز سيرفر البث، يرجى المحاولة بعد قليل');
+    }
+  } catch (err) {
+    console.error('Playback stream error:', err);
+    DOM.playerSpinner.style.display = 'none';
+    showToast('⚠️ تعذر الاتصال بسيرفر البث');
+  }
 
   // Save progress locally in browser localStorage
   const progKey = `${item.subjectId || item.id}_${season}_${episode}`;
@@ -790,32 +828,32 @@ async function startPlayback(item, season = 0, episode = 0) {
     },
     season,
     episode,
-    time: 60,
+    time: 0,
     duration: 7200,
     timestamp: Date.now()
   };
   localStorage.setItem('cf_web_progress', JSON.stringify(state.watchProgress));
   renderContinueWatching();
-
-  showToast(`🎬 تشغيل ${title} بأعلى جودة 1080p FHD ✓`);
 }
 
 function closePlayer() {
-  if (DOM.webPlayerIframe) {
-    DOM.webPlayerIframe.src = 'about:blank';
-    DOM.webPlayerIframe.style.display = 'none';
-  }
   if (DOM.mainVideo) {
     DOM.mainVideo.pause();
     DOM.mainVideo.src = '';
+  }
+  if (DOM.webPlayerIframe) {
+    DOM.webPlayerIframe.src = 'about:blank';
+    DOM.webPlayerIframe.style.display = 'none';
   }
   DOM.webPlayer.classList.remove('active');
   document.body.style.overflow = 'auto';
   renderContinueWatching();
 }
-async function loadSubtitles(subjectId, season, episode) {
+
+async function loadSubtitles(subjectId, season, episode, detailPath = '') {
   try {
-    const url = `${API_BASE}/api/subtitles?subjectId=${encodeURIComponent(subjectId)}&se=${season}&ep=${episode}`;
+    const dPath = detailPath || `subject-${subjectId}`;
+    const url = `${API_BASE}/api/subtitles?subjectId=${encodeURIComponent(subjectId)}&se=${season}&ep=${episode}&detailPath=${encodeURIComponent(dPath)}`;
     const res = await fetch(url);
     const data = await res.json();
 
@@ -826,13 +864,15 @@ async function loadSubtitles(subjectId, season, episode) {
       const arSub = data.subtitles.find(s => s.isArabic);
       if (arSub) {
         activateSubtitle(arSub);
+      } else if (data.subtitles[0]) {
+        activateSubtitle(data.subtitles[0]);
       }
 
       // Build Subtitles modal list
       DOM.subtitlesList.innerHTML = `
         <button class="sub-opt-btn ${!arSub ? 'active' : ''}" data-id="off">إيقاف الترجمة (Off)</button>
         ${data.subtitles.map(s => `
-          <button class="sub-opt-btn ${s === arSub ? 'active' : ''}" data-url="${s.url}" data-lang="${s.language}">
+          <button class="sub-opt-btn ${s === arSub ? 'active' : ''}" data-url="${s.url}" data-proxy="${s.proxyVttUrl || ''}" data-lang="${s.language}">
             ${s.label} ${s.isArabic ? '(العربية الافتراضية)' : ''}
           </button>
         `).join('')}
@@ -860,10 +900,12 @@ async function loadSubtitles(subjectId, season, episode) {
 async function activateSubtitle(subObj) {
   state.playing.activeSubtitleTrack = subObj;
   try {
-    const res = await fetch(subObj.url);
+    const fetchUrl = subObj.proxyVttUrl || subObj.url;
+    const res = await fetch(fetchUrl);
     const text = await res.text();
     state.playing.subCues = parseVttOrSrt(text);
-    showToast(`تم تفعيل ترجمة: ${subObj.label}`);
+    showToast(`✓ تم تفعيل ${subObj.label}`);
+    applySubtitleSettings();
   } catch (e) {
     console.error('Subtitle parse error:', e);
   }
