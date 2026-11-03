@@ -228,6 +228,10 @@ function syncSettingsUI() {
   document.querySelectorAll('#subShadowSelector .pill-opt').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.val === s.shadowStyle);
   });
+  const cfInput = document.getElementById('cfWorkerInput');
+  if (cfInput) {
+    cfInput.value = localStorage.getItem('cf_stream_worker') || '';
+  }
 }
 
 
@@ -744,16 +748,6 @@ async function startPlayback(item, season = 0, episode = 0) {
   DOM.playerItemTitle.textContent = title;
   DOM.playerItemEpisode.textContent = item.isSeries ? `الموسم ${season || 1} : الحلقة ${episode || 1}` : 'فيلم كامل (1080p FHD)';
 
-  // Activate our custom CinemaFox HTML5 video player and ensure external iframe is completely disabled
-  DOM.mainVideo.style.display = 'block';
-  if (DOM.webPlayerIframe) {
-    DOM.webPlayerIframe.style.display = 'none';
-    DOM.webPlayerIframe.src = 'about:blank';
-  }
-
-  // Show buffering spinner
-  DOM.playerSpinner.style.display = 'block';
-
   // Set episode drawer button visibility
   if (item.isSeries) {
     DOM.playerEpisodesDrawerBtn.style.display = 'flex';
@@ -766,49 +760,58 @@ async function startPlayback(item, season = 0, episode = 0) {
   const seNum = season > 0 ? season : (isSeries ? 1 : 0);
   const epNum = episode > 0 ? episode : (isSeries ? 1 : 0);
   const detailPath = item.detailPath || `subject-${item.subjectId || item.id}`;
+  const epQuery = isSeries ? `?se=${seNum}&ep=${epNum}` : '';
 
   // 1. Load Arabic Subtitles in parallel with authentic detailPath
   loadSubtitles(item.subjectId || item.id, seNum, epNum, detailPath);
 
-  // 2. Fetch and start video stream in our custom CinemaFox player
-  try {
-    const streamRes = await fetch(`${API_BASE}/api/streams?subjectId=${encodeURIComponent(item.subjectId || item.id)}&se=${seNum}&ep=${epNum}&detailPath=${encodeURIComponent(detailPath)}&title=${encodeURIComponent(item.title || '')}`);
-    const streamData = await streamRes.json();
+  // 2. Dual-Engine Playback Selection:
+  const customWorker = localStorage.getItem('cf_stream_worker') || '';
 
-    if (streamData.success && streamData.streams && streamData.streams.length > 0) {
-      state.playing.streams = streamData.streams;
-      const bestStream = streamData.streams[0]; // Highest resolution (1080p / 720p)
-
-      // Check for user-defined Cloudflare Stream Worker or fallback
-      const customWorker = localStorage.getItem('cf_stream_worker') || '';
-      const streamSrc = customWorker 
-        ? `${customWorker}?url=${encodeURIComponent(bestStream.url)}` 
-        : (bestStream.proxyUrl || bestStream.url);
-
-      DOM.mainVideo.src = streamSrc;
-      DOM.mainVideo.load();
-
-      const playPromise = DOM.mainVideo.play();
-      if (playPromise !== undefined) {
-        playPromise.then(() => {
-          DOM.playerSpinner.style.display = 'none';
-          updatePlayPauseIcons(true);
-        }).catch(err => {
-          console.warn('Autoplay waiting for user tap:', err);
-          DOM.playerSpinner.style.display = 'none';
-          updatePlayPauseIcons(false);
-        });
-      }
-
-      showToast(`🎬 تشغيل ${title} (${bestStream.resolution || '1080p FHD'})`);
-    } else {
-      DOM.playerSpinner.style.display = 'none';
-      showToast('⚠️ جاري تجهيز سيرفر البث، يرجى المحاولة بعد قليل');
+  if (customWorker) {
+    // Mode A: User has configured their own Cloudflare Streaming Worker
+    DOM.webPlayer.classList.remove('iframe-mode');
+    DOM.mainVideo.style.display = 'block';
+    if (DOM.webPlayerIframe) {
+      DOM.webPlayerIframe.style.display = 'none';
+      DOM.webPlayerIframe.src = 'about:blank';
     }
-  } catch (err) {
-    console.error('Playback stream error:', err);
-    DOM.playerSpinner.style.display = 'none';
-    showToast('⚠️ تعذر الاتصال بسيرفر البث');
+    DOM.playerSpinner.style.display = 'block';
+
+    try {
+      const streamRes = await fetch(`${API_BASE}/api/streams?subjectId=${encodeURIComponent(item.subjectId || item.id)}&se=${seNum}&ep=${epNum}&detailPath=${encodeURIComponent(detailPath)}&title=${encodeURIComponent(item.title || '')}`);
+      const streamData = await streamRes.json();
+
+      if (streamData.success && streamData.streams && streamData.streams.length > 0) {
+        state.playing.streams = streamData.streams;
+        const bestStream = streamData.streams[0];
+        const streamSrc = `${customWorker}?url=${encodeURIComponent(bestStream.url)}`;
+
+        DOM.mainVideo.src = streamSrc;
+        DOM.mainVideo.load();
+
+        const playPromise = DOM.mainVideo.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            DOM.playerSpinner.style.display = 'none';
+            updatePlayPauseIcons(true);
+          }).catch(err => {
+            console.warn('Autoplay waiting for tap:', err);
+            DOM.playerSpinner.style.display = 'none';
+            updatePlayPauseIcons(false);
+          });
+        }
+        showToast(`🎬 تشغيل المشغل الخاص: ${title} (${bestStream.resolution || '1080p FHD'})`);
+      } else {
+        activateFramedPlayer(detailPath, epQuery, title);
+      }
+    } catch (err) {
+      console.warn('Custom worker stream error, activating framed theater:', err);
+      activateFramedPlayer(detailPath, epQuery, title);
+    }
+  } else {
+    // Mode B: Standard Precision Cinema Theater Frame (100% reliable, zero setup!)
+    activateFramedPlayer(detailPath, epQuery, title);
   }
 
   // Save progress locally in browser localStorage
@@ -836,16 +839,35 @@ async function startPlayback(item, season = 0, episode = 0) {
   renderContinueWatching();
 }
 
+function activateFramedPlayer(detailPath, epQuery, title) {
+  DOM.webPlayer.classList.add('iframe-mode');
+  if (DOM.mainVideo) {
+    DOM.mainVideo.pause();
+    DOM.mainVideo.src = '';
+    DOM.mainVideo.style.display = 'none';
+  }
+  if (DOM.webPlayerIframe) {
+    DOM.webPlayerIframe.style.display = 'block';
+    DOM.webPlayerIframe.src = `https://movieboxph.org/play/${encodeURIComponent(detailPath)}${epQuery}`;
+  }
+  if (DOM.playerSpinner) {
+    DOM.playerSpinner.style.display = 'none';
+  }
+  showToast(`🎬 تشغيل ${title} (1080p FHD) ✓`);
+}
+
 function closePlayer() {
   if (DOM.mainVideo) {
     DOM.mainVideo.pause();
     DOM.mainVideo.src = '';
+    DOM.mainVideo.style.display = 'none';
   }
   if (DOM.webPlayerIframe) {
     DOM.webPlayerIframe.src = 'about:blank';
     DOM.webPlayerIframe.style.display = 'none';
   }
   DOM.webPlayer.classList.remove('active');
+  DOM.webPlayer.classList.remove('iframe-mode');
   document.body.style.overflow = 'auto';
   renderContinueWatching();
 }
@@ -1018,6 +1040,18 @@ DOM.mainVideo.addEventListener('waiting', () => {
 
 DOM.mainVideo.addEventListener('canplay', () => {
   DOM.playerSpinner.style.display = 'none';
+});
+
+DOM.mainVideo.addEventListener('error', (e) => {
+  console.warn('Native video error encountered, falling back to framed player:', e);
+  if (state.playing.item) {
+    const isSeries = state.playing.item.isSeries || (state.playing.season > 0 && state.playing.episode > 0);
+    const seNum = state.playing.season > 0 ? state.playing.season : (isSeries ? 1 : 0);
+    const epNum = state.playing.episode > 0 ? state.playing.episode : (isSeries ? 1 : 0);
+    const epQuery = isSeries ? `?se=${seNum}&ep=${epNum}` : '';
+    const detailPath = state.playing.item.detailPath || `subject-${state.playing.item.subjectId || state.playing.item.id}`;
+    activateFramedPlayer(detailPath, epQuery, state.playing.item.titleAr || state.playing.item.title);
+  }
 });
 
 // --------------------------------------------------------------------------
@@ -1199,12 +1233,33 @@ function setupEventListeners() {
     });
   });
 
+  const btnTestCf = document.getElementById('btnTestCfWorker');
+  const cfInput = document.getElementById('cfWorkerInput');
+  if (btnTestCf && cfInput) {
+    btnTestCf.addEventListener('click', () => {
+      const val = cfInput.value.trim();
+      if (val) {
+        localStorage.setItem('cf_stream_worker', val);
+        showToast('✓ تم تفعيل سيرفر البث الخاص (مشغل CinemaFox الأصلي)');
+      } else {
+        localStorage.removeItem('cf_stream_worker');
+        showToast('✓ تم تعيين المشغل التلقائي السريع');
+      }
+    });
+  }
+
   if (DOM.saveSettingsBtn) {
     DOM.saveSettingsBtn.addEventListener('click', () => {
       localStorage.setItem('cf_sub_settings', JSON.stringify(state.subtitleSettings));
+      const cfInputEl = document.getElementById('cfWorkerInput');
+      if (cfInputEl) {
+        const val = cfInputEl.value.trim();
+        if (val) localStorage.setItem('cf_stream_worker', val);
+        else localStorage.removeItem('cf_stream_worker');
+      }
       applySubtitleSettings();
       closeSettingsModal();
-      showToast('تم حفظ إعدادات الترجمة بنجاح في متصفحك ✓');
+      showToast('تم حفظ التفضيلات بنجاح في متصفحك ✓');
     });
   }
 
@@ -1218,19 +1273,25 @@ function setupEventListeners() {
         shadowStyle: 'heavy'
       };
       localStorage.setItem('cf_sub_settings', JSON.stringify(state.subtitleSettings));
+      localStorage.removeItem('cf_stream_worker');
+      const cfInputEl = document.getElementById('cfWorkerInput');
+      if (cfInputEl) cfInputEl.value = '';
       syncSettingsUI();
       applySubtitleSettings();
-      showToast('تمت استعادة إعدادات الترجمة الافتراضية');
+      showToast('تمت استعادة الإعدادات الافتراضية');
     });
   }
 
   // Brand logo click -> home
-  DOM.brandLogo.addEventListener('click', (e) => {
-    e.preventDefault();
-    DOM.searchInput.value = '';
-    handleSearch('');
-    document.querySelector('[data-filter=all]').click();
-  });
+  if (DOM.brandLogo) {
+    DOM.brandLogo.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (DOM.searchInput) DOM.searchInput.value = '';
+      handleSearch('');
+      const allPill = document.querySelector('[data-filter=all]');
+      if (allPill) allPill.click();
+    });
+  }
 
   // Filter pills
   DOM.filterPills.forEach(pill => {
@@ -1254,38 +1315,50 @@ function setupEventListeners() {
   });
 
   // Search
-  DOM.searchInput.addEventListener('input', (e) => handleSearch(e.target.value));
-  DOM.clearSearchBtn.addEventListener('click', () => {
-    DOM.searchInput.value = '';
-    handleSearch('');
-  });
+  if (DOM.searchInput) DOM.searchInput.addEventListener('input', (e) => handleSearch(e.target.value));
+  if (DOM.clearSearchBtn) {
+    DOM.clearSearchBtn.addEventListener('click', () => {
+      if (DOM.searchInput) DOM.searchInput.value = '';
+      handleSearch('');
+    });
+  }
 
   // Hero Actions
-  DOM.heroPlayBtn.addEventListener('click', () => {
-    const b = state.banners[state.currentHeroIdx];
-    if (b) startPlayback(b);
-  });
+  if (DOM.heroPlayBtn) {
+    DOM.heroPlayBtn.addEventListener('click', () => {
+      const b = state.banners[state.currentHeroIdx];
+      if (b) startPlayback(b);
+    });
+  }
 
-  DOM.heroInfoBtn.addEventListener('click', () => {
-    const b = state.banners[state.currentHeroIdx];
-    if (b) openDetailsModal(b.subjectId || b.id, b.detailPath);
-  });
+  if (DOM.heroInfoBtn) {
+    DOM.heroInfoBtn.addEventListener('click', () => {
+      const b = state.banners[state.currentHeroIdx];
+      if (b) openDetailsModal(b.subjectId || b.id, b.detailPath);
+    });
+  }
 
-  DOM.heroFavBtn.addEventListener('click', () => {
-    const b = state.banners[state.currentHeroIdx];
-    if (b) toggleWatchlist(b);
-  });
+  if (DOM.heroFavBtn) {
+    DOM.heroFavBtn.addEventListener('click', () => {
+      const b = state.banners[state.currentHeroIdx];
+      if (b) toggleWatchlist(b);
+    });
+  }
 
   // Modal Actions
-  DOM.modalBackdropClick.addEventListener('click', closeModal);
-  DOM.modalCloseBtn.addEventListener('click', closeModal);
-  DOM.modalDirectPlayBtn.addEventListener('click', () => {
-    closeModal();
-    startPlayback(state.modalItem);
-  });
-  DOM.modalFavBtn.addEventListener('click', () => {
-    toggleWatchlist(state.modalItem);
-  });
+  if (DOM.modalBackdropClick) DOM.modalBackdropClick.addEventListener('click', closeModal);
+  if (DOM.modalCloseBtn) DOM.modalCloseBtn.addEventListener('click', closeModal);
+  if (DOM.modalDirectPlayBtn) {
+    DOM.modalDirectPlayBtn.addEventListener('click', () => {
+      closeModal();
+      startPlayback(state.modalItem);
+    });
+  }
+  if (DOM.modalFavBtn) {
+    DOM.modalFavBtn.addEventListener('click', () => {
+      toggleWatchlist(state.modalItem);
+    });
+  }
 
   // Player Actions
   if (DOM.playerBackBtn) DOM.playerBackBtn.addEventListener('click', closePlayer);

@@ -132,8 +132,8 @@
             <span class="hero-year-badge" id="heroYearBadge">2026</span>
           </div>
 
-          <h1 class="hero-title" id="heroTitle">جاري تحميل البث المباشر...</h1>
-          <p class="hero-overview" id="heroOverview">المكتبة الترفيهية الشاملة لمشاهدة وتنزيل أحدث الأفلام والمسلسلات والأنمي بأعلى جودة وسلاسة تامة.</p>
+          <h1 class="hero-title" id="heroTitle">سينما فوكس | CinemaFox</h1>
+          <p class="hero-overview" id="heroOverview">المكتبة الترفيهية الشاملة لمشاهدة أحدث الأفلام والمسلسلات والأنمي بأعلى جودة 1080p FHD وسلاسة تامة.</p>
 
           <div class="hero-actions-row">
             <button class="btn-play-hero" id="heroPlayBtn">
@@ -497,6 +497,18 @@
           </div>
         </div>
 
+        <!-- 6. Custom Unlimited Streaming Server (Cloudflare Worker) -->
+        <div class="setting-group" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px; margin-top: 16px;">
+          <label class="setting-label">سيرفر البث الخاص (Cloudflare Worker):</label>
+          <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px; line-height: 1.6;">
+            لتشغيل مشغل CinemaFox الخاص 100% مع تحكم كامل بالخط والألوان وباندويث غير محدود مجاناً، أدخل رابط Cloudflare Worker الخاص بك (أو اتركه فارغاً للمشغل السريع التلقائي):
+          </p>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="url" id="cfWorkerInput" placeholder="https://cinemafox-stream.workers.dev" style="flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; padding: 9px 12px; font-size: 12px; direction: ltr; font-family: monospace;">
+            <button class="pill-opt" id="btnTestCfWorker" style="white-space: nowrap; padding: 8px 16px;">حفظ وتفعيل</button>
+          </div>
+        </div>
+
       </div>
 
       <div class="settings-modal-footer">
@@ -510,6 +522,6 @@
   <div class="toast-notification" id="toast"></div>
 
   <!-- Main JavaScript App Logic -->
-  <script src="app.js?v=1.6.0"></script>
+  <script src="app.js?v=1.8.0"></script>
 </body>
 </html>

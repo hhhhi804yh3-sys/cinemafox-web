@@ -1873,11 +1873,44 @@ html, body {
   z-index: 5;
 }
 
-.web-player-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  background: #000;
+/* Precision Cinema Framing: Crops out external sidebars, headers, and playback decks on PC */
+@media (min-width: 1025px) {
+  .web-player-iframe {
+    position: absolute;
+    width: 144%;
+    height: 140%;
+    left: -7.5%;
+    top: -16%;
+    border: none;
+    background: #000;
+  }
+}
+
+/* Mobile & Tablets (< 1025px): MovieBox already hides sidebar on mobile, 100% full-screen fit */
+@media (max-width: 1024px) {
+  .web-player-iframe {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    left: 0;
+    top: 0;
+    border: none;
+    background: #000;
+  }
+}
+
+/* Iframe mode overrides: hide native bottom bar and center play button, keep top exit bar accessible */
+.web-player-container.iframe-mode .player-bottom-bar,
+.web-player-container.iframe-mode .player-center-btn-wrap {
+  display: none !important;
+}
+
+.player-top-bar {
+  pointer-events: none !important;
+}
+
+.player-top-bar > * {
+  pointer-events: auto !important;
 }
 
 .player-live-badge {
