@@ -1877,16 +1877,16 @@ html, body {
 @media (min-width: 1025px) {
   .web-player-iframe {
     position: absolute;
-    width: 146%;
-    height: 146%;
-    left: -23%;
-    top: -18%;
+    width: 168%;
+    height: 172%;
+    left: -34%;
+    top: -29%;
     border: none;
     background: #000;
   }
 }
 
-/* Mobile & Tablets (< 1025px): MovieBox already hides sidebar on mobile, 100% full-screen fit */
+/* Mobile & Tablets (< 1025px): 100% full-screen fit */
 @media (max-width: 1024px) {
   .web-player-iframe {
     position: absolute;
@@ -1897,6 +1897,25 @@ html, body {
     border: none;
     background: #000;
   }
+}
+
+/* Fullscreen mode support across all browsers */
+:fullscreen .web-player-container,
+:-webkit-full-screen .web-player-container {
+  width: 100vw !important;
+  height: 100vh !important;
+  background: #000 !important;
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 999999 !important;
+}
+
+:fullscreen .web-player-iframe,
+:-webkit-full-screen .web-player-iframe {
+  width: 172% !important;
+  height: 176% !important;
+  left: -36% !important;
+  top: -30% !important;
 }
 
 /* Iframe mode overrides: hide native bottom bar and center play button, keep top exit bar accessible */

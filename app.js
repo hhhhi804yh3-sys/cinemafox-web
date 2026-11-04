@@ -1133,10 +1133,29 @@ function seekRelative(sec) {
 }
 
 function toggleFullscreen() {
-  if (!document.fullscreenElement) {
-    DOM.webPlayer.requestFullscreen().catch(() => {});
+  const container = DOM.webPlayer || document.documentElement;
+  const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+  
+  if (!isFull) {
+    if (container.requestFullscreen) {
+      container.requestFullscreen().catch(() => {});
+    } else if (container.webkitRequestFullscreen) {
+      container.webkitRequestFullscreen();
+    } else if (container.mozRequestFullScreen) {
+      container.mozRequestFullScreen();
+    } else if (container.msRequestFullscreen) {
+      container.msRequestFullscreen();
+    }
   } else {
-    document.exitFullscreen().catch(() => {});
+    if (document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    } else if (document.mozCancelFullScreen) {
+      document.mozCancelFullScreen();
+    } else if (document.msExitFullscreen) {
+      document.msExitFullscreen();
+    }
   }
 }
 

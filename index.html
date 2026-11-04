@@ -19,7 +19,7 @@
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
 
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=2.0.0">
+  <link rel="stylesheet" href="style.css?v=2.1.0">
 </head>
 <body>
 
@@ -290,7 +290,7 @@
     
     <!-- Cinema Fox High-Performance Cinema Theater Stream -->
     <div class="web-player-frame-wrap" id="playerFrameWrap">
-      <iframe id="webPlayerIframe" class="web-player-iframe" src="" allowfullscreen allow="autoplay; fullscreen; picture-in-picture; encrypted-media"></iframe>
+      <iframe id="webPlayerIframe" class="web-player-iframe" src="" allowfullscreen allow="autoplay; fullscreen; picture-in-picture; encrypted-media" sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"></iframe>
       <video id="mainVideoPlayer" class="main-video-player" playsinline webkit-playsinline style="display: none;"></video>
     </div>
 
@@ -523,6 +523,6 @@
   <div class="toast-notification" id="toast"></div>
 
   <!-- Main JavaScript App Logic -->
-  <script src="app.js?v=2.0.0"></script>
+  <script src="app.js?v=2.1.0"></script>
 </body>
 </html>
