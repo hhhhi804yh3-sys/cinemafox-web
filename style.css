@@ -1877,10 +1877,10 @@ html, body {
 @media (min-width: 1025px) {
   .web-player-iframe {
     position: absolute;
-    width: 144%;
-    height: 140%;
-    left: -7.5%;
-    top: -16%;
+    width: 146%;
+    height: 146%;
+    left: -23%;
+    top: -18%;
     border: none;
     background: #000;
   }
