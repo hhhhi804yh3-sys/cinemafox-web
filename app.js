@@ -1133,18 +1133,23 @@ function seekRelative(sec) {
 }
 
 function toggleFullscreen() {
-  const container = DOM.webPlayer || document.documentElement;
+  const container = (DOM.webPlayer && DOM.webPlayer.classList.contains('active')) ? DOM.webPlayer : document.documentElement;
   const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
   
   if (!isFull) {
-    if (container.requestFullscreen) {
+    const target = (DOM.webPlayer && DOM.webPlayer.classList.contains('iframe-mode') && DOM.webPlayerIframe) ? DOM.webPlayerIframe : container;
+    if (target.requestFullscreen) {
+      target.requestFullscreen().catch(() => {
+        if (container.requestFullscreen) container.requestFullscreen().catch(() => {});
+      });
+    } else if (target.webkitRequestFullscreen) {
+      target.webkitRequestFullscreen();
+    } else if (target.mozRequestFullScreen) {
+      target.mozRequestFullScreen();
+    } else if (target.msRequestFullscreen) {
+      target.msRequestFullscreen();
+    } else if (container.requestFullscreen) {
       container.requestFullscreen().catch(() => {});
-    } else if (container.webkitRequestFullscreen) {
-      container.webkitRequestFullscreen();
-    } else if (container.mozRequestFullScreen) {
-      container.mozRequestFullScreen();
-    } else if (container.msRequestFullscreen) {
-      container.msRequestFullscreen();
     }
   } else {
     if (document.exitFullscreen) {
