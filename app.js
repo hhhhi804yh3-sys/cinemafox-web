@@ -150,6 +150,7 @@ function applySubtitleSettings(settings = state.subtitleSettings) {
   if (DOM.subPreviewCue) {
     DOM.subPreviewCue.style.fontSize = `${settings.fontSize}px`;
     DOM.subPreviewCue.style.fontFamily = settings.fontFamily;
+    DOM.subPreviewCue.style.fontWeight = settings.fontFamily.includes('Times New Roman') ? 'bold' : 'normal';
     DOM.subPreviewCue.style.color = settings.color;
 
     if (settings.bgStyle === 'glass') {
@@ -187,6 +188,7 @@ function applySubtitleSettings(settings = state.subtitleSettings) {
     ::cue, .subtitle-text, #activeSubtitleText {
       font-size: ${settings.fontSize}px !important;
       font-family: ${settings.fontFamily} !important;
+      font-weight: ${settings.fontFamily.includes('Times New Roman') ? 'bold !important;' : 'normal;'};
       color: ${settings.color} !important;
       background: ${settings.bgStyle === 'glass' ? 'rgba(0,0,0,0.65)' : settings.bgStyle} !important;
       ${settings.shadowStyle === 'heavy' ? 'text-shadow: 0 2px 6px #000, 0 0 10px #000, 0 0 15px #000 !important;' : ''}
@@ -766,7 +768,7 @@ async function startPlayback(item, season = 0, episode = 0) {
   loadSubtitles(item.subjectId || item.id, seNum, epNum, detailPath);
 
   // 2. Dual-Engine Playback Selection:
-  const customWorker = localStorage.getItem('cf_stream_worker') || '';
+  const customWorker = localStorage.getItem('cf_stream_worker') || 'https://aged-shape-5a86.hhhhi804yh7.workers.dev/';
 
   if (customWorker) {
     // Mode A: User has configured their own Cloudflare Streaming Worker

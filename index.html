@@ -459,6 +459,7 @@
           <label class="setting-label">نوع الخط (Font Family):</label>
           <div class="settings-pill-selector" id="subFontSelector">
             <button class="pill-opt active" data-val="'Almarai', sans-serif">المراعي (Almarai)</button>
+            <button class="pill-opt" data-val="'Times New Roman', Times, serif" style="font-family: 'Times New Roman', Times, serif; font-weight: bold;">Times New Roman Bold</button>
             <button class="pill-opt" data-val="'Cairo', sans-serif">القاهرة (Cairo)</button>
             <button class="pill-opt" data-val="sans-serif">النظام القياسي</button>
           </div>
@@ -504,7 +505,7 @@
             لتشغيل مشغل CinemaFox الخاص 100% مع تحكم كامل بالخط والألوان وباندويث غير محدود مجاناً، أدخل رابط Cloudflare Worker الخاص بك (أو اتركه فارغاً للمشغل السريع التلقائي):
           </p>
           <div style="display: flex; gap: 8px; align-items: center;">
-            <input type="url" id="cfWorkerInput" placeholder="https://cinemafox-stream.workers.dev" style="flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; padding: 9px 12px; font-size: 12px; direction: ltr; font-family: monospace;">
+            <input type="url" id="cfWorkerInput" placeholder="https://aged-shape-5a86.hhhhi804yh7.workers.dev/" style="flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; padding: 9px 12px; font-size: 12px; direction: ltr; font-family: monospace;">
             <button class="pill-opt" id="btnTestCfWorker" style="white-space: nowrap; padding: 8px 16px;">حفظ وتفعيل</button>
           </div>
         </div>
@@ -522,6 +523,6 @@
   <div class="toast-notification" id="toast"></div>
 
   <!-- Main JavaScript App Logic -->
-  <script src="app.js?v=1.8.0"></script>
+  <script src="app.js?v=1.9.0"></script>
 </body>
 </html>
